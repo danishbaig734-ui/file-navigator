@@ -1,0 +1,6 @@
+{
+  "summary":  "Finalized implementation plan tailored for Android 12 (API 31/32) reliability and forward compatibility. Details the Termux startService/bindService fallback chain, permission strategies, plain AlertDialog confirmation, zero-foreground-service architecture, and inline job re-arming.",
+  "updatedAt":  "2026-10-05T12:02:41.719412930Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

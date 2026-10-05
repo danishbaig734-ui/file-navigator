@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Terminal window outline -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M24,28h60c3.3,0 6,2.7 6,6v40c0,3.3 -2.7,6 -6,6H24c-3.3,0 -6,-2.7 -6,-6V34c0,-3.3 2.7,-6 6,-6z" />
+
+    <!-- Terminal header bar -->
+    <path
+        android:fillColor="#334155"
+        android:pathData="M24,28h60c3.3,0 6,2.7 6,6v8H18v-8c0,-3.3 2.7,-6 6,-6z" />
+
+    <!-- Window control dots -->
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M25,35a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M32,35a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M39,35a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+
+    <!-- Command prompt chevron '>' -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M28,50 L36,56 L28,62 L30,64 L40,56 L30,48 Z" />
+
+    <!-- Cursor '_' -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M43,62 H53 V64 H43 Z" />
+
+    <!-- Lightning / Trigger Bolt -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M68,44 L56,58 H66 L60,72 L76,54 H66 Z" />
+</vector>

@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Termux Trigger</string>
+    <string name="trigger_state_on">Trigger: ON</string>
+    <string name="trigger_state_off">Trigger: OFF</string>
+    <string name="button_turn_on">Turn ON</string>
+    <string name="button_turn_off">Turn OFF</string>
+    <string name="button_test_trigger">Test Trigger</string>
+    <string name="script_path_label">Termux Script Path:</string>
+    <string name="default_script_path">/data/data/com.termux/files/home/file-bus.sh</string>
+    <string name="log_section_title">Event Log (last 100 entries):</string>
+    <string name="button_clear_log">Clear Log</string>
+    <string name="dialog_clear_title">Clear log?</string>
+    <string name="dialog_clear_message">This will erase all recorded events from storage.</string>
+    <string name="dialog_clear_confirm">Clear</string>
+    <string name="dialog_cancel">Cancel</string>
+</resources>
