@@ -5,7 +5,7 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk = 34
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.termuxtrigger.bkptwf"
