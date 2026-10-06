@@ -104,8 +104,8 @@ class TriggerJobService : JobService() {
 
             val builder = JobInfo.Builder(JOB_ID, component)
                 .addTriggerContentUri(triggerUri)
-                .setTriggerContentUpdateDelay(5000)
-                .setTriggerContentMaxDelay(60000)
+                .setTriggerContentUpdateDelay(0)
+                .setTriggerContentMaxDelay(1000)
 
             jobScheduler.schedule(builder.build())
         }
