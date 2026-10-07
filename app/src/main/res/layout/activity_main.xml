@@ -24,7 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Silent background storage trigger for Termux"
+            android:text="Manual trigger for Termux script"
             android:textColor="#9E9E9E"
             android:textSize="13sp" />
 
@@ -36,33 +36,23 @@
             android:background="#2C2C2C" />
 
         <TextView
-            android:id="@+id/text_trigger_state"
+            android:id="@+id/text_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/trigger_state_off"
-            android:textColor="#B0BEC5"
-            android:textSize="24sp"
+            android:text="Ready"
+            android:textColor="#4CAF50"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/button_toggle"
+            android:id="@+id/button_run"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:minHeight="48dp"
-            android:text="@string/button_turn_on"
-            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            android:minHeight="56dp"
+            android:text="Run Script Now"
+            android:textSize="17sp"
             android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/button_test"
-            style="?android:attr/buttonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="@string/button_test_trigger"
-            android:textSize="15sp" />
 
         <TextView
             android:id="@+id/label_script_path"
@@ -124,15 +114,31 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/button_clear_log"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
             android:layout_marginTop="10dp"
-            android:minHeight="48dp"
-            android:text="@string/button_clear_log"
-            android:textSize="14sp" />
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/button_refresh_log"
+                style="?android:attr/buttonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:minHeight="48dp"
+                android:text="Refresh Log"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/button_clear_log"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/button_clear_log"
+                android:textSize="14sp" />
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>

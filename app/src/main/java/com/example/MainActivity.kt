@@ -1,12 +1,11 @@
 package com.example
 
-import android.Manifest
-import android.app.job.JobScheduler
+import android.content.ComponentName
 import android.content.Context
-import android.content.pm.PackageManager
-import android.graphics.Color
-import android.os.Build
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -14,36 +13,22 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 
 /**
  * Main and only Activity of the application.
- * Manages the trigger toggle, manual test trigger, script path configuration,
- * media permissions request, and rolling execution log.
+ * Manages manual Termux execution, script path configuration, and rolling execution log.
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var textTriggerState: TextView
-    private lateinit var buttonToggle: Button
-    private lateinit var buttonTest: Button
+    private lateinit var textStatus: TextView
+    private lateinit var buttonRun: Button
     private lateinit var editScriptPath: EditText
     private lateinit var textLog: TextView
+    private lateinit var buttonRefreshLog: Button
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
-
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        val allGranted = results.values.all { it }
-        if (!allGranted) {
-            LogManager.log(this, "Permissions denied: trigger will not fire until granted")
-        } else {
-            LogManager.log(this, "Storage permissions granted")
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,9 +37,7 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupScriptPath()
         setupListeners()
-        updateUiState()
-        loadInitialLog()
-        requestStoragePermissions()
+        refreshLogDisplay()
     }
 
     override fun onResume() {
@@ -67,7 +50,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        updateUiState()
+        refreshLogDisplay()
     }
 
     override fun onPause() {
@@ -76,21 +59,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        textTriggerState = findViewById(R.id.text_trigger_state)
-        buttonToggle = findViewById(R.id.button_toggle)
-        buttonTest = findViewById(R.id.button_test)
+        textStatus = findViewById(R.id.text_status)
+        buttonRun = findViewById(R.id.button_run)
         editScriptPath = findViewById(R.id.edit_script_path)
         textLog = findViewById(R.id.text_log)
+        buttonRefreshLog = findViewById(R.id.button_refresh_log)
         buttonClearLog = findViewById(R.id.button_clear_log)
         mainScrollView = findViewById(R.id.main_scroll_view)
     }
 
     private fun setupScriptPath() {
-        val prefs = getSharedPreferences(TriggerJobService.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedPath = prefs.getString(
-            TriggerJobService.PREF_KEY_SCRIPT_PATH,
-            TriggerJobService.DEFAULT_SCRIPT_PATH
-        ) ?: TriggerJobService.DEFAULT_SCRIPT_PATH
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH) ?: DEFAULT_SCRIPT_PATH
 
         editScriptPath.setText(savedPath)
 
@@ -99,7 +79,7 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val path = s?.toString()?.trim() ?: ""
                 if (path.isNotEmpty()) {
-                    prefs.edit().putString(TriggerJobService.PREF_KEY_SCRIPT_PATH, path).apply()
+                    prefs.edit().putString(PREF_KEY_SCRIPT_PATH, path).apply()
                 }
             }
             override fun afterTextChanged(s: Editable?) {}
@@ -107,32 +87,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        val prefs = getSharedPreferences(TriggerJobService.PREFS_NAME, Context.MODE_PRIVATE)
-
-        buttonToggle.setOnClickListener {
-            val isCurrentlyOn = isTriggerActive()
-            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            if (isCurrentlyOn) {
-                jobScheduler.cancel(TriggerJobService.JOB_ID_FILE)
-                jobScheduler.cancel(TriggerJobService.JOB_ID_PERIODIC)
-                prefs.edit().putBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, false).apply()
-                updateUiState(isActive = false)
-                LogManager.log(this, "job cancelled")
-            } else {
-                jobScheduler.schedule(TriggerJobService.buildFileJob(this))
-                jobScheduler.schedule(TriggerJobService.buildPeriodicJob(this))
-                prefs.edit().putBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, true).apply()
-                updateUiState(isActive = true)
-                LogManager.log(this, "job scheduled")
-            }
+        buttonRun.setOnClickListener {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
+                DEFAULT_SCRIPT_PATH
+            } ?: DEFAULT_SCRIPT_PATH
+            dispatchTermux(this, currentPath)
         }
 
-        buttonTest.setOnClickListener {
-            LogManager.log(this, "manual test fired")
-            val currentPath = editScriptPath.text.toString().trim().ifEmpty {
-                TriggerJobService.DEFAULT_SCRIPT_PATH
-            }
-            TriggerJobService.dispatchTermux(this, currentPath)
+        buttonRefreshLog.setOnClickListener {
+            refreshLogDisplay()
         }
 
         buttonClearLog.setOnClickListener {
@@ -141,61 +105,68 @@ class MainActivity : AppCompatActivity() {
                 .setMessage(R.string.dialog_clear_message)
                 .setPositiveButton(R.string.dialog_clear_confirm) { _, _ ->
                     LogManager.clearLog(this)
-                    textLog.text = getString(R.string.log_section_title)
+                    textLog.text = "No events recorded yet."
                 }
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .show()
         }
     }
 
-    private fun isTriggerActive(): Boolean {
-        val prefs = getSharedPreferences(TriggerJobService.PREFS_NAME, Context.MODE_PRIVATE)
-        val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        val isFileJobScheduled = jobScheduler.getPendingJob(TriggerJobService.JOB_ID_FILE) != null
-        return isFileJobScheduled || prefs.getBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, false)
-    }
-
-    private fun updateUiState(isActive: Boolean = isTriggerActive()) {
-        if (isActive) {
-            textTriggerState.text = getString(R.string.trigger_state_on)
-            textTriggerState.setTextColor(Color.parseColor("#4CAF50")) // Green
-            buttonToggle.text = getString(R.string.button_turn_off)
-        } else {
-            textTriggerState.text = getString(R.string.trigger_state_off)
-            textTriggerState.setTextColor(Color.parseColor("#B0BEC5")) // Muted Gray
-            buttonToggle.text = getString(R.string.button_turn_on)
-        }
-    }
-
-    private fun loadInitialLog() {
+    private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
         textLog.text = content
+        mainScrollView.post {
+            mainScrollView.fullScroll(View.FOCUS_DOWN)
+        }
     }
 
-    private fun requestStoragePermissions() {
-        val permissionsToRequest = mutableListOf<String>()
+    companion object {
+        const val PREFS_NAME = "app_prefs"
+        const val PREF_KEY_SCRIPT_PATH = "script_path"
+        const val DEFAULT_SCRIPT_PATH = "/data/data/com.termux/files/home/file-bus.sh"
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ granular media permissions
-            val permissions = arrayOf(
-                Manifest.permission.READ_MEDIA_IMAGES,
-                Manifest.permission.READ_MEDIA_VIDEO,
-                Manifest.permission.READ_MEDIA_AUDIO
-            )
-            for (permission in permissions) {
-                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                    permissionsToRequest.add(permission)
+        /**
+         * Dispatches command intent to Termux's RunCommandService with Android 12 fallback chain.
+         * Tries startService first; if blocked by background restrictions, falls back to bindService.
+         * Never uses startForegroundService or notifications.
+         */
+        fun dispatchTermux(context: Context, scriptPath: String) {
+            val termuxIntent = Intent().apply {
+                setClassName("com.termux", "com.termux.app.RunCommandService")
+                action = "com.termux.RUN_COMMAND"
+                putExtra("com.termux.RUN_COMMAND_PATH", scriptPath)
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+            }
+
+            try {
+                context.startService(termuxIntent)
+                LogManager.log(context, "Termux started via startService")
+            } catch (e: Exception) {
+                if (e is IllegalStateException || e is SecurityException) {
+                    LogManager.log(context, "startService blocked: ${e.javaClass.simpleName} - ${e.message}")
+                    try {
+                        val connection = object : ServiceConnection {
+                            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                                try {
+                                    context.unbindService(this)
+                                } catch (_: Exception) {}
+                            }
+
+                            override fun onServiceDisconnected(name: ComponentName?) {}
+                        }
+                        val bound = context.bindService(termuxIntent, connection, Context.BIND_AUTO_CREATE)
+                        if (bound) {
+                            LogManager.log(context, "Termux dispatched via bindService")
+                        } else {
+                            LogManager.log(context, "bindService returned false")
+                        }
+                    } catch (bindEx: Exception) {
+                        LogManager.log(context, "Termux intent failed: ${bindEx.javaClass.simpleName} - ${bindEx.message}")
+                    }
+                } else {
+                    LogManager.log(context, "Termux intent failed: ${e.javaClass.simpleName} - ${e.message}")
                 }
             }
-        } else {
-            // Android 12 and below (API <= 32)
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 }
