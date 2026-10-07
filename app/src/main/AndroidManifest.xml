@@ -36,6 +36,11 @@
             android:label="Rules Editor"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".LogViewerActivity"
+            android:exported="false"
+            android:label="Logs" />
+
         <service
             android:name=".TriggerTileService"
             android:exported="true"

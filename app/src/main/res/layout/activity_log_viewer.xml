@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121212">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1E1E1E"
+        app:title="Logs"
+        app:titleTextColor="#FFFFFF"
+        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationContentDescription="Back" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#1E1E1E">
+
+        <Button
+            android:id="@+id/tab_actions"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:text="Actions"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/tab_unmatched"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:minHeight="48dp"
+            android:text="Unmatched"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/tab_errors"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:minHeight="48dp"
+            android:text="Errors"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/scroll_log"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:background="#121212">
+
+        <TextView
+            android:id="@+id/text_log_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:gravity="top|start"
+            android:padding="8dp"
+            android:scrollbars="vertical"
+            android:textColor="#80D8FF"
+            android:textIsSelectable="true"
+            android:textSize="11sp" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:background="#1E1E1E">
+
+        <Button
+            android:id="@+id/button_clear_log"
+            style="?android:attr/buttonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="Clear This Log"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</LinearLayout>

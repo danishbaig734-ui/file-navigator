@@ -12,6 +12,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -92,20 +93,22 @@ class RulesEditorActivity : AppCompatActivity() {
         }
 
         buttonSave.setOnClickListener {
-            saveRulesToFile()
+            saveRulesToFile(showSuccessToast = true)
         }
 
         buttonRunScript.setOnClickListener {
-            saveRulesToFile()
-            val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-            val scriptPath = prefs.getString(
-                MainActivity.PREF_KEY_SCRIPT_PATH,
-                MainActivity.DEFAULT_SCRIPT_PATH
-            )?.ifEmpty {
-                MainActivity.DEFAULT_SCRIPT_PATH
-            } ?: MainActivity.DEFAULT_SCRIPT_PATH
+            val saved = saveRulesToFile(showSuccessToast = false)
+            if (saved) {
+                val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+                val scriptPath = prefs.getString(
+                    MainActivity.PREF_KEY_SCRIPT_PATH,
+                    MainActivity.DEFAULT_SCRIPT_PATH
+                )?.ifEmpty {
+                    MainActivity.DEFAULT_SCRIPT_PATH
+                } ?: MainActivity.DEFAULT_SCRIPT_PATH
 
-            dispatchTermux(scriptPath)
+                dispatchTermux(scriptPath)
+            }
         }
     }
 
@@ -206,11 +209,13 @@ class RulesEditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveRulesToFile(): Boolean {
+    private fun saveRulesToFile(showSuccessToast: Boolean = true): Boolean {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val uriString = prefs.getString(PREF_KEY_RULES_TREE_URI, null)
         if (uriString == null) {
-            LogManager.log(this, "rules.conf save failed: no folder permission granted")
+            val reason = "no folder permission granted"
+            LogManager.log(this, "rules.conf save failed: $reason")
+            Toast.makeText(this, "Save failed: $reason", Toast.LENGTH_LONG).show()
             requestFolderPermission()
             return false
         }
@@ -221,7 +226,9 @@ class RulesEditorActivity : AppCompatActivity() {
         return try {
             val docUri = getOrCreateRulesDocumentUri(treeUri)
             if (docUri == null) {
-                LogManager.log(this, "rules.conf save failed: unable to create or locate rules.conf")
+                val reason = "unable to create or locate rules.conf"
+                LogManager.log(this, "rules.conf save failed: $reason")
+                Toast.makeText(this, "Save failed: $reason", Toast.LENGTH_LONG).show()
                 return false
             }
 
@@ -235,9 +242,14 @@ class RulesEditorActivity : AppCompatActivity() {
             }
 
             LogManager.log(this, "rules.conf saved")
+            if (showSuccessToast) {
+                Toast.makeText(this, "Rules saved", Toast.LENGTH_SHORT).show()
+            }
             true
         } catch (e: Exception) {
-            LogManager.log(this, "rules.conf save failed: ${e.message}")
+            val reason = e.message ?: "unknown error"
+            LogManager.log(this, "rules.conf save failed: $reason")
+            Toast.makeText(this, "Save failed: $reason", Toast.LENGTH_LONG).show()
             false
         }
     }
@@ -289,6 +301,7 @@ class RulesEditorActivity : AppCompatActivity() {
         try {
             startService(termuxIntent)
             LogManager.log(this, "editor: Termux intent sent")
+            Toast.makeText(this, "Script triggered", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             if (e is IllegalStateException || e is SecurityException) {
                 try {
@@ -304,14 +317,21 @@ class RulesEditorActivity : AppCompatActivity() {
                     val bound = bindService(termuxIntent, connection, Context.BIND_AUTO_CREATE)
                     if (bound) {
                         LogManager.log(this, "editor: Termux intent sent")
+                        Toast.makeText(this, "Script triggered", Toast.LENGTH_SHORT).show()
                     } else {
-                        LogManager.log(this, "editor: Termux intent failed: bindService returned false")
+                        val reason = "bindService returned false"
+                        LogManager.log(this, "editor: Termux intent failed: $reason")
+                        Toast.makeText(this, "Trigger failed: $reason", Toast.LENGTH_LONG).show()
                     }
                 } catch (bindEx: Exception) {
-                    LogManager.log(this, "editor: Termux intent failed: ${bindEx.message}")
+                    val reason = bindEx.message ?: "bindService exception"
+                    LogManager.log(this, "editor: Termux intent failed: $reason")
+                    Toast.makeText(this, "Trigger failed: $reason", Toast.LENGTH_LONG).show()
                 }
             } else {
-                LogManager.log(this, "editor: Termux intent failed: ${e.message}")
+                val reason = e.message ?: "startService exception"
+                LogManager.log(this, "editor: Termux intent failed: $reason")
+                Toast.makeText(this, "Trigger failed: $reason", Toast.LENGTH_LONG).show()
             }
         }
     }
