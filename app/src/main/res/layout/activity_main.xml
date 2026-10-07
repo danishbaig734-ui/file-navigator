@@ -54,6 +54,16 @@
             android:textSize="17sp"
             android:textStyle="bold" />
 
+        <Button
+            android:id="@+id/button_edit_rules"
+            style="?android:attr/buttonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:text="Edit Rules"
+            android:textSize="15sp" />
+
         <TextView
             android:id="@+id/label_script_path"
             android:layout_width="wrap_content"

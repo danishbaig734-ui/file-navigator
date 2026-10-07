@@ -30,6 +30,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".RulesEditorActivity"
+            android:exported="false"
+            android:label="Rules Editor"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".TriggerTileService"
             android:exported="true"

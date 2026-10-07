@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var textStatus: TextView
     private lateinit var buttonRun: Button
+    private lateinit var buttonEditRules: Button
     private lateinit var editScriptPath: EditText
     private lateinit var textLog: TextView
     private lateinit var buttonRefreshLog: Button
@@ -61,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private fun initViews() {
         textStatus = findViewById(R.id.text_status)
         buttonRun = findViewById(R.id.button_run)
+        buttonEditRules = findViewById(R.id.button_edit_rules)
         editScriptPath = findViewById(R.id.edit_script_path)
         textLog = findViewById(R.id.text_log)
         buttonRefreshLog = findViewById(R.id.button_refresh_log)
@@ -93,6 +95,11 @@ class MainActivity : AppCompatActivity() {
                 DEFAULT_SCRIPT_PATH
             } ?: DEFAULT_SCRIPT_PATH
             dispatchTermux(this, currentPath)
+        }
+
+        buttonEditRules.setOnClickListener {
+            val intent = Intent(this, RulesEditorActivity::class.java)
+            startActivity(intent)
         }
 
         buttonRefreshLog.setOnClickListener {
