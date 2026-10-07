@@ -1,6 +1,7 @@
 package com.example
 
 import android.Manifest
+import android.app.job.JobScheduler
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -110,13 +111,16 @@ class MainActivity : AppCompatActivity() {
 
         buttonToggle.setOnClickListener {
             val isCurrentlyOn = isTriggerActive()
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
             if (isCurrentlyOn) {
-                TriggerJobService.cancelJob(this)
+                jobScheduler.cancel(TriggerJobService.JOB_ID_FILE)
+                jobScheduler.cancel(TriggerJobService.JOB_ID_PERIODIC)
                 prefs.edit().putBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, false).apply()
                 updateUiState(isActive = false)
                 LogManager.log(this, "job cancelled")
             } else {
-                TriggerJobService.scheduleJob(this)
+                jobScheduler.schedule(TriggerJobService.buildFileJob(this))
+                jobScheduler.schedule(TriggerJobService.buildPeriodicJob(this))
                 prefs.edit().putBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, true).apply()
                 updateUiState(isActive = true)
                 LogManager.log(this, "job scheduled")
@@ -146,7 +150,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun isTriggerActive(): Boolean {
         val prefs = getSharedPreferences(TriggerJobService.PREFS_NAME, Context.MODE_PRIVATE)
-        return TriggerJobService.isJobScheduled(this) || prefs.getBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, false)
+        val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        val isFileJobScheduled = jobScheduler.getPendingJob(TriggerJobService.JOB_ID_FILE) != null
+        return isFileJobScheduled || prefs.getBoolean(TriggerJobService.PREF_KEY_TRIGGER_ENABLED, false)
     }
 
     private fun updateUiState(isActive: Boolean = isTriggerActive()) {

@@ -12,15 +12,17 @@ import android.net.Uri
 import android.os.IBinder
 
 /**
- * Background JobService triggered by file modifications in Android media storage.
+ * Background JobService triggered by file modifications in Android media storage
+ * or periodic fallback intervals.
  *
  * Note: Returns false to indicate the work completed synchronously within this method call.
- * Re-arming is done inline before return.
+ * Re-arming is done inline before return for file triggers.
  */
 class TriggerJobService : JobService() {
 
     override fun onStartJob(params: JobParameters?): Boolean {
-        LogManager.log(this, "job fired")
+        val jobId = params?.jobId
+        LogManager.log(this, "job fired (id=$jobId)")
 
         // Read script path fresh on every fire from SharedPreferences (never cached)
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -29,11 +31,14 @@ class TriggerJobService : JobService() {
         // Execute dispatch via fallback chain (startService -> bindService)
         dispatchTermux(this, scriptPath)
 
-        // ContentUri triggers are one-shot; re-arm inline
-        scheduleJob(this)
-        LogManager.log(this, "job re-scheduled")
+        // ContentUri triggers are one-shot; re-arm inline only if JOB_ID_FILE
+        if (jobId == JOB_ID_FILE) {
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            jobScheduler.schedule(buildFileJob(this))
+            LogManager.log(this, "job re-scheduled")
+        }
 
-        // Returns false to indicate the work completed synchronously within this method call. Re-arming is done inline before return.
+        // Returns false to indicate the work completed synchronously within this method call.
         return false
     }
 
@@ -43,7 +48,11 @@ class TriggerJobService : JobService() {
     }
 
     companion object {
-        const val JOB_ID = 4040
+        const val JOB_ID_FILE = 1001
+        const val JOB_ID_PERIODIC = 1002
+        @Deprecated("Use JOB_ID_FILE or JOB_ID_PERIODIC", ReplaceWith("JOB_ID_FILE"))
+        const val JOB_ID = JOB_ID_FILE
+
         const val PREFS_NAME = "app_prefs"
         const val PREF_KEY_TRIGGER_ENABLED = "trigger_enabled"
         const val PREF_KEY_SCRIPT_PATH = "script_path"
@@ -94,36 +103,65 @@ class TriggerJobService : JobService() {
         }
 
         /**
-         * Configures and schedules the ContentUri trigger job in JobScheduler.
+         * Builds the ContentUri-triggered job for file changes.
          */
-        fun scheduleJob(context: Context) {
-            val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        fun buildFileJob(context: Context): JobInfo {
             val component = ComponentName(context, TriggerJobService::class.java)
             val uri = Uri.parse("content://media/external/file")
             val triggerUri = JobInfo.TriggerContentUri(uri, JobInfo.TriggerContentUri.FLAG_NOTIFY_FOR_DESCENDANTS)
 
-            val builder = JobInfo.Builder(JOB_ID, component)
-                .addTriggerContentUri(triggerUri)
-                .setTriggerContentUpdateDelay(0)
-                .setTriggerContentMaxDelay(1000)
-
-            jobScheduler.schedule(builder.build())
+            return try {
+                JobInfo.Builder(JOB_ID_FILE, component)
+                    .addTriggerContentUri(triggerUri)
+                    .setTriggerContentUpdateDelay(0)
+                    .setTriggerContentMaxDelay(1000)
+                    .setPersisted(true)
+                    .build()
+            } catch (_: IllegalArgumentException) {
+                JobInfo.Builder(JOB_ID_FILE, component)
+                    .addTriggerContentUri(triggerUri)
+                    .setTriggerContentUpdateDelay(0)
+                    .setTriggerContentMaxDelay(1000)
+                    .build()
+            }
         }
 
         /**
-         * Cancels the trigger job in JobScheduler.
+         * Builds the periodic 15-minute fallback job.
+         */
+        fun buildPeriodicJob(context: Context): JobInfo {
+            val component = ComponentName(context, TriggerJobService::class.java)
+
+            return JobInfo.Builder(JOB_ID_PERIODIC, component)
+                .setPeriodic(15 * 60 * 1000L)
+                .setPersisted(true)
+                .build()
+        }
+
+        /**
+         * Configures and schedules both trigger jobs in JobScheduler.
+         */
+        fun scheduleJob(context: Context) {
+            val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            jobScheduler.schedule(buildFileJob(context))
+            jobScheduler.schedule(buildPeriodicJob(context))
+        }
+
+        /**
+         * Cancels both trigger jobs in JobScheduler.
          */
         fun cancelJob(context: Context) {
             val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            jobScheduler.cancel(JOB_ID)
+            jobScheduler.cancel(JOB_ID_FILE)
+            jobScheduler.cancel(JOB_ID_PERIODIC)
         }
 
         /**
-         * Checks whether the job is currently scheduled in JobScheduler.
+         * Checks whether the file trigger job is currently scheduled in JobScheduler.
          */
         fun isJobScheduled(context: Context): Boolean {
             val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            return jobScheduler.getPendingJob(JOB_ID) != null
+            return jobScheduler.getPendingJob(JOB_ID_FILE) != null
         }
     }
 }

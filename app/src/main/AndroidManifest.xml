@@ -19,7 +19,6 @@
     <queries>
         <package android:name="com.termux" />
     </queries>
-    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
