@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -36,26 +37,78 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyTheme() {
         val dark = isDarkMode()
+
+        // 1. Root background
         val root = findViewById<View>(R.id.rootLayout)
-        val gear = findViewById<ImageButton>(R.id.btnSettings)
-
         val bgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
-        val gearBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-        val gearIcon = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-
         root.setBackgroundColor(bgColor)
 
-        val bgDrawable = gear.background.mutate() as android.graphics.drawable.GradientDrawable
-        bgDrawable.setColor(gearBg)
+        // 2. Heading text
+        val headerTitle = findViewById<TextView>(R.id.txtHeaderTitle)
+        headerTitle.setTextColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+
+        // 3. Subtitle
+        val subtitle = findViewById<TextView>(R.id.txtSubtitle)
+        subtitle.setTextColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+
+        // 4. Pill badge
+        val pill = findViewById<TextView>(R.id.txtPill)
+        val pillBgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFE5E5E5.toInt()
+        (pill.background.mutate() as? GradientDrawable)?.setColor(pillBgColor)
+        pill.setTextColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+
+        // 5. Circular settings button
+        val gear = findViewById<ImageButton>(R.id.btnSettings)
+        val gearBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val gearIcon = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+        (gear.background.mutate() as? GradientDrawable)?.setColor(gearBg)
         gear.setColorFilter(gearIcon)
+
+        // 6. Circular action button
+        val runBtn = findViewById<ImageButton>(R.id.btnRunScript)
+        (runBtn.background.mutate() as? GradientDrawable)?.setColor(0xFF6C63FF.toInt())
+        runBtn.setColorFilter(0xFFFFFFFF.toInt())
+
+        // 7. Secondary buttons (and refresh/clear log buttons)
+        val secBtnBgColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
+        val secBtnTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        listOf(
+            findViewById<Button>(R.id.btnEditRules),
+            findViewById<Button>(R.id.btnViewLogs),
+            findViewById<Button>(R.id.btnRegrantAccess),
+            findViewById<Button>(R.id.btnRefreshLog),
+            findViewById<Button>(R.id.btnClearLog)
+        ).forEach { btn ->
+            (btn.background.mutate() as? GradientDrawable)?.setColor(secBtnBgColor)
+            btn.setTextColor(secBtnTextColor)
+        }
+
+        // 8. Labels
+        val labelColor = if (dark) 0xFFCCCCCC.toInt() else 0xFF555555.toInt()
+        findViewById<TextView>(R.id.lblScriptPath).setTextColor(labelColor)
+        findViewById<TextView>(R.id.lblEventLog).setTextColor(labelColor)
+
+        // 9. Path & Log fields
+        val fieldBgColor = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
+        val fieldTextColor = if (dark) 0xFFF5F5F5.toInt() else 0xFF1A1A1A.toInt()
+
+        val pathField = findViewById<EditText>(R.id.etScriptPath)
+        (pathField.background.mutate() as? GradientDrawable)?.setColor(fieldBgColor)
+        pathField.setTextColor(fieldTextColor)
+        pathField.setHintTextColor(if (dark) 0xFF616161.toInt() else 0xFF9E9E9E.toInt())
+
+        val logScroll = findViewById<View>(R.id.scrollLog)
+        (logScroll.background.mutate() as? GradientDrawable)?.setColor(fieldBgColor)
+        findViewById<TextView>(R.id.tvLog).setTextColor(fieldTextColor)
     }
 
-    private lateinit var buttonRun: Button
+    private lateinit var buttonRun: ImageButton
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var buttonRegrantAccess: Button
     private lateinit var editScriptPath: EditText
     private lateinit var textLog: TextView
+    private lateinit var scrollLog: ScrollView
     private lateinit var buttonRefreshLog: Button
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
@@ -101,8 +154,8 @@ class MainActivity : AppCompatActivity() {
         LogManager.setListener { updatedText ->
             runOnUiThread {
                 textLog.text = updatedText
-                mainScrollView.post {
-                    mainScrollView.fullScroll(View.FOCUS_DOWN)
+                scrollLog.post {
+                    scrollLog.fullScroll(View.FOCUS_DOWN)
                 }
             }
         }
@@ -115,14 +168,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        buttonRun = findViewById(R.id.button_run)
-        buttonEditRules = findViewById(R.id.button_edit_rules)
-        buttonViewLogs = findViewById(R.id.button_view_logs)
-        buttonRegrantAccess = findViewById(R.id.button_regrant_access)
-        editScriptPath = findViewById(R.id.edit_script_path)
-        textLog = findViewById(R.id.text_log)
-        buttonRefreshLog = findViewById(R.id.button_refresh_log)
-        buttonClearLog = findViewById(R.id.button_clear_log)
+        buttonRun = findViewById(R.id.btnRunScript)
+        buttonEditRules = findViewById(R.id.btnEditRules)
+        buttonViewLogs = findViewById(R.id.btnViewLogs)
+        buttonRegrantAccess = findViewById(R.id.btnRegrantAccess)
+        editScriptPath = findViewById(R.id.etScriptPath)
+        textLog = findViewById(R.id.tvLog)
+        scrollLog = findViewById(R.id.scrollLog)
+        buttonRefreshLog = findViewById(R.id.btnRefreshLog)
+        buttonClearLog = findViewById(R.id.btnClearLog)
         mainScrollView = findViewById(R.id.rootLayout)
     }
 
@@ -205,8 +259,8 @@ class MainActivity : AppCompatActivity() {
     private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
         textLog.text = content
-        mainScrollView.post {
-            mainScrollView.fullScroll(View.FOCUS_DOWN)
+        scrollLog.post {
+            scrollLog.fullScroll(View.FOCUS_DOWN)
         }
     }
 

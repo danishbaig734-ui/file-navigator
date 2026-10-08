@@ -59,6 +59,7 @@ secrets {
 dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.appcompat)
+  implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
   testImplementation(libs.junit)
   testImplementation(libs.androidx.core)

@@ -1,169 +1,222 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:padding="20dp">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/txtPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/pill_bg"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:text="v1.0"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <ImageButton
-                android:id="@+id/btnSettings"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_gravity="top|end"
-                android:layout_marginTop="12dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/gear_button_bg"
-                android:contentDescription="Settings"
-                android:padding="10dp"
-                android:scaleType="centerInside"
-                android:src="@android:drawable/ic_menu_preferences"
-                android:tint="#FFFFFF" />
-        </FrameLayout>
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/circular_button_bg"
+            android:contentDescription="Settings"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_gear"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/txtHeaderTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:layout_marginEnd="16dp"
+            android:fontFamily="sans-serif-black"
+            android:letterSpacing="-0.03"
+            android:lineSpacingMultiplier="0.9"
+            android:text="File&#10;Navigator"
+            android:textSize="56sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/btnRunScript"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/txtPill" />
+
+        <TextView
+            android:id="@+id/txtSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:alpha="0.6"
+            android:text="Sort your downloads, instantly"
+            android:textSize="16sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/txtHeaderTitle" />
+
+        <ImageButton
+            android:id="@+id/btnRunScript"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/circular_action_bg"
+            android:contentDescription="Run Script Now"
+            android:padding="28dp"
+            android:scaleType="centerInside"
+            android:src="@android:drawable/ic_media_play"
+            app:layout_constraintBottom_toBottomOf="@id/txtSubtitle"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/txtHeaderTitle" />
+
+        <Button
+            android:id="@+id/btnEditRules"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="40dp"
+            android:background="@drawable/rounded_button_bg"
+            android:text="Edit Rules"
+            android:textSize="15sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
+
+        <Button
+            android:id="@+id/btnViewLogs"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/rounded_button_bg"
+            android:text="View Logs"
+            android:textSize="15sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnEditRules" />
+
+        <Button
+            android:id="@+id/btnRegrantAccess"
+            style="?android:attr/buttonStyle"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/rounded_button_bg"
+            android:text="Re-grant Folder Access"
+            android:textSize="15sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnViewLogs" />
+
+        <TextView
+            android:id="@+id/lblScriptPath"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Termux Script Path:"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnRegrantAccess" />
+
+        <EditText
+            android:id="@+id/etScriptPath"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/path_field_bg"
+            android:fontFamily="monospace"
+            android:hint="@string/default_script_path"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:minHeight="48dp"
+            android:padding="12dp"
+            android:singleLine="true"
+            android:text="@string/default_script_path"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/lblScriptPath" />
+
+        <TextView
+            android:id="@+id/lblEventLog"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Event Log (last 100 entries):"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/etScriptPath" />
+
+        <ScrollView
+            android:id="@+id/scrollLog"
+            android:layout_width="0dp"
+            android:layout_height="220dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/log_field_bg"
+            android:fillViewport="true"
+            android:nestedScrollingEnabled="true"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/lblEventLog">
+
+            <TextView
+                android:id="@+id/tvLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:padding="12dp"
+                android:text="No events recorded yet."
+                android:textIsSelectable="true"
+                android:textSize="11sp" />
+        </ScrollView>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:id="@+id/rowLogButtons"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="20dp">
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:gravity="end"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/scrollLog">
 
             <Button
-                android:id="@+id/button_run"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:minHeight="56dp"
-                android:text="Run Script Now"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/button_edit_rules"
+                android:id="@+id/btnRefreshLog"
                 style="?android:attr/buttonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="48dp"
-                android:text="Edit Rules"
-                android:textSize="15sp" />
-
-            <Button
-                android:id="@+id/button_view_logs"
-                style="?android:attr/buttonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="48dp"
-                android:text="View Logs"
-                android:textSize="15sp" />
-
-            <Button
-                android:id="@+id/button_regrant_access"
-                style="?android:attr/buttonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="48dp"
-                android:text="Re-grant Folder Access"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/label_script_path"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/script_path_label"
-                android:textColor="#E0E0E0"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/rounded_button_bg"
+                android:minHeight="40dp"
+                android:paddingHorizontal="16dp"
+                android:text="Refresh"
+                android:textSize="14sp" />
 
-            <EditText
-                android:id="@+id/edit_script_path"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="#1E1E1E"
-                android:fontFamily="monospace"
-                android:hint="@string/default_script_path"
-                android:imeOptions="actionDone"
-                android:importantForAutofill="no"
-                android:inputType="textUri"
-                android:maxLines="1"
-                android:minHeight="48dp"
-                android:padding="12dp"
-                android:singleLine="true"
-                android:text="@string/default_script_path"
-                android:textColor="#80D8FF"
-                android:textColorHint="#616161"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/label_log"
+            <Button
+                android:id="@+id/btnClearLog"
+                style="?android:attr/buttonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/log_section_title"
-                android:textColor="#E0E0E0"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="#1E1E1E"
-                android:minHeight="180dp"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/text_log"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:text="No events recorded yet."
-                    android:textColor="#80D8FF"
-                    android:textIsSelectable="true"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="end"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/button_refresh_log"
-                    style="?android:attr/buttonStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minHeight="48dp"
-                    android:text="Refresh Log"
-                    android:textSize="14sp" />
-
-                <Button
-                    android:id="@+id/button_clear_log"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minHeight="48dp"
-                    android:text="@string/button_clear_log"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
+                android:background="@drawable/rounded_button_bg"
+                android:minHeight="40dp"
+                android:paddingHorizontal="16dp"
+                android:text="Clear"
+                android:textSize="14sp" />
         </LinearLayout>
 
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
