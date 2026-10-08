@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="theme_bg_dark">#1A1A1A</color>
+    <color name="theme_bg_light">#F5F5F5</color>
+    <color name="gear_bg_dark">#FFFFFF</color>
+    <color name="gear_bg_light">#000000</color>
+    <color name="gear_icon_dark">#000000</color>
+    <color name="gear_icon_light">#FFFFFF</color>
 </resources>

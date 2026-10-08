@@ -1,173 +1,168 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/main_scroll_view"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="#121212">
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Manual trigger for Termux script"
-            android:textColor="#9E9E9E"
-            android:textSize="13sp" />
-
-        <View
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp"
-            android:background="#2C2C2C" />
+            android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/text_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Ready"
-            android:textColor="#4CAF50"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/button_run"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:minHeight="56dp"
-            android:text="Run Script Now"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/button_edit_rules"
-            style="?android:attr/buttonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="Edit Rules"
-            android:textSize="15sp" />
-
-        <Button
-            android:id="@+id/button_view_logs"
-            style="?android:attr/buttonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="View Logs"
-            android:textSize="15sp" />
-
-        <Button
-            android:id="@+id/button_regrant_access"
-            style="?android:attr/buttonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="Re-grant Folder Access"
-            android:textSize="15sp" />
-
-        <TextView
-            android:id="@+id/label_script_path"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/script_path_label"
-            android:textColor="#E0E0E0"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/edit_script_path"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:background="#1E1E1E"
-            android:fontFamily="monospace"
-            android:hint="@string/default_script_path"
-            android:imeOptions="actionDone"
-            android:importantForAutofill="no"
-            android:inputType="textUri"
-            android:maxLines="1"
-            android:minHeight="48dp"
-            android:padding="12dp"
-            android:singleLine="true"
-            android:text="@string/default_script_path"
-            android:textColor="#80D8FF"
-            android:textColorHint="#616161"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/label_log"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/log_section_title"
-            android:textColor="#E0E0E0"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            <ImageButton
+                android:id="@+id/btnSettings"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/gear_button_bg"
+                android:contentDescription="Settings"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_preferences"
+                android:tint="#FFFFFF" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:background="#1E1E1E"
-            android:minHeight="180dp"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="20dp">
 
-            <TextView
-                android:id="@+id/text_log"
+            <Button
+                android:id="@+id/button_run"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="No events recorded yet."
-                android:textColor="#80D8FF"
-                android:textIsSelectable="true"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="end"
-            android:orientation="horizontal">
+                android:layout_marginTop="16dp"
+                android:minHeight="56dp"
+                android:text="Run Script Now"
+                android:textSize="17sp"
+                android:textStyle="bold" />
 
             <Button
-                android:id="@+id/button_refresh_log"
+                android:id="@+id/button_edit_rules"
                 style="?android:attr/buttonStyle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_marginTop="8dp"
                 android:minHeight="48dp"
-                android:text="Refresh Log"
-                android:textSize="14sp" />
+                android:text="Edit Rules"
+                android:textSize="15sp" />
 
             <Button
-                android:id="@+id/button_clear_log"
+                android:id="@+id/button_view_logs"
+                style="?android:attr/buttonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp"
+                android:text="View Logs"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/button_regrant_access"
+                style="?android:attr/buttonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp"
+                android:text="Re-grant Folder Access"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/label_script_path"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/script_path_label"
+                android:textColor="#E0E0E0"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/edit_script_path"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="#1E1E1E"
+                android:fontFamily="monospace"
+                android:hint="@string/default_script_path"
+                android:imeOptions="actionDone"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:maxLines="1"
                 android:minHeight="48dp"
-                android:text="@string/button_clear_log"
-                android:textSize="14sp" />
+                android:padding="12dp"
+                android:singleLine="true"
+                android:text="@string/default_script_path"
+                android:textColor="#80D8FF"
+                android:textColorHint="#616161"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/label_log"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/log_section_title"
+                android:textColor="#E0E0E0"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="#1E1E1E"
+                android:minHeight="180dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/text_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="No events recorded yet."
+                    android:textColor="#80D8FF"
+                    android:textIsSelectable="true"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="end"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/button_refresh_log"
+                    style="?android:attr/buttonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:minHeight="48dp"
+                    android:text="Refresh Log"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/button_clear_log"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_clear_log"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
         </LinearLayout>
 
     </LinearLayout>

@@ -41,6 +41,11 @@
             android:exported="false"
             android:label="Logs" />
 
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings" />
+
         <service
             android:name=".TriggerTileService"
             android:exported="true"

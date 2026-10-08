@@ -14,6 +14,7 @@ import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -22,12 +23,33 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * Main and only Activity of the application.
- * Manages manual Termux execution, script path configuration, and rolling execution log.
+ * Main Activity of the application.
+ * Manages manual Termux execution, script path configuration, rolling execution log, and theme.
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var textStatus: TextView
+    private val PREFS = "app_prefs"
+    private val KEY_DARK_MODE = "dark_mode"
+
+    private fun isDarkMode(): Boolean =
+        getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_DARK_MODE, true)
+
+    private fun applyTheme() {
+        val dark = isDarkMode()
+        val root = findViewById<View>(R.id.rootLayout)
+        val gear = findViewById<ImageButton>(R.id.btnSettings)
+
+        val bgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
+        val gearBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val gearIcon = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+
+        root.setBackgroundColor(bgColor)
+
+        val bgDrawable = gear.background.mutate() as android.graphics.drawable.GradientDrawable
+        bgDrawable.setColor(gearBg)
+        gear.setColorFilter(gearIcon)
+    }
+
     private lateinit var buttonRun: Button
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
@@ -65,6 +87,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        applyTheme()
+
         initViews()
         setupScriptPath()
         setupListeners()
@@ -73,6 +97,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        applyTheme()
         LogManager.setListener { updatedText ->
             runOnUiThread {
                 textLog.text = updatedText
@@ -90,7 +115,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        textStatus = findViewById(R.id.text_status)
         buttonRun = findViewById(R.id.button_run)
         buttonEditRules = findViewById(R.id.button_edit_rules)
         buttonViewLogs = findViewById(R.id.button_view_logs)
@@ -99,7 +123,7 @@ class MainActivity : AppCompatActivity() {
         textLog = findViewById(R.id.text_log)
         buttonRefreshLog = findViewById(R.id.button_refresh_log)
         buttonClearLog = findViewById(R.id.button_clear_log)
-        mainScrollView = findViewById(R.id.main_scroll_view)
+        mainScrollView = findViewById(R.id.rootLayout)
     }
 
     private fun setupScriptPath() {
@@ -121,6 +145,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
         buttonRun.setOnClickListener {
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
