@@ -45,6 +45,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Pick Path"
             android:textSize="13sp" />
@@ -56,6 +57,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Save"
             android:textSize="13sp" />
@@ -66,6 +68,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1.3"
             android:layout_marginStart="8dp"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Run Script Now"
             android:textSize="13sp"

@@ -19,6 +19,11 @@ import android.widget.ImageButton
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -43,6 +48,9 @@ class MainActivity : AppCompatActivity() {
         val bgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
         root.setBackgroundColor(bgColor)
 
+        val header = findViewById<View>(R.id.headerRow)
+        header.setBackgroundColor(if (dark) 0xFF222222.toInt() else 0xFFFFFFFF.toInt())
+
         // 2. Heading text
         val headerTitle = findViewById<TextView>(R.id.txtHeaderTitle)
         headerTitle.setTextColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
@@ -61,21 +69,37 @@ class MainActivity : AppCompatActivity() {
         val gear = findViewById<ImageButton>(R.id.btnSettings)
         val gearBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
         val gearIcon = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-        (gear.background.mutate() as? GradientDrawable)?.setColor(gearBg)
+        val gearBgDrawable = (gear.background.mutate() as? android.graphics.drawable.RippleDrawable)?.getDrawable(0) as? GradientDrawable
+            ?: gear.background.mutate() as? GradientDrawable
+        gearBgDrawable?.setColor(gearBg)
         gear.setColorFilter(gearIcon)
 
         // 6. Circular action button
         val runBtn = findViewById<ImageButton>(R.id.btnRunScript)
-        (runBtn.background.mutate() as? GradientDrawable)?.setColor(0xFF6C63FF.toInt())
-        runBtn.setColorFilter(0xFFFFFFFF.toInt())
+        val runBtnBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val runBtnIcon = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+        val runBgDrawable = (runBtn.background.mutate() as? android.graphics.drawable.RippleDrawable)?.getDrawable(0) as? GradientDrawable
+            ?: runBtn.background.mutate() as? GradientDrawable
+        runBgDrawable?.setColor(runBtnBg)
+        runBtn.setColorFilter(runBtnIcon)
 
         // 7. Secondary buttons (and refresh/clear log buttons)
-        val secBtnBgColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
+        val editRulesBtn = findViewById<Button>(R.id.btnEditRules)
+        val viewLogsBtn = findViewById<Button>(R.id.btnViewLogs)
         val secBtnTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+
+        if (dark) {
+            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple)
+            viewLogsBtn.setBackgroundResource(R.drawable.rounded_button_ripple)
+        } else {
+            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple_light)
+            viewLogsBtn.setBackgroundResource(R.drawable.rounded_button_ripple_light)
+        }
+        editRulesBtn.setTextColor(secBtnTextColor)
+        viewLogsBtn.setTextColor(secBtnTextColor)
+
+        val secBtnBgColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
         listOf(
-            findViewById<Button>(R.id.btnEditRules),
-            findViewById<Button>(R.id.btnViewLogs),
-            findViewById<Button>(R.id.btnRegrantAccess),
             findViewById<Button>(R.id.btnRefreshLog),
             findViewById<Button>(R.id.btnClearLog)
         ).forEach { btn ->
@@ -85,17 +109,11 @@ class MainActivity : AppCompatActivity() {
 
         // 8. Labels
         val labelColor = if (dark) 0xFFCCCCCC.toInt() else 0xFF555555.toInt()
-        findViewById<TextView>(R.id.lblScriptPath).setTextColor(labelColor)
         findViewById<TextView>(R.id.lblEventLog).setTextColor(labelColor)
 
-        // 9. Path & Log fields
+        // 9. Log fields
         val fieldBgColor = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
         val fieldTextColor = if (dark) 0xFFF5F5F5.toInt() else 0xFF1A1A1A.toInt()
-
-        val pathField = findViewById<EditText>(R.id.etScriptPath)
-        (pathField.background.mutate() as? GradientDrawable)?.setColor(fieldBgColor)
-        pathField.setTextColor(fieldTextColor)
-        pathField.setHintTextColor(if (dark) 0xFF616161.toInt() else 0xFF9E9E9E.toInt())
 
         val logScroll = findViewById<View>(R.id.scrollLog)
         (logScroll.background.mutate() as? GradientDrawable)?.setColor(fieldBgColor)
@@ -105,8 +123,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonRun: ImageButton
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
-    private lateinit var buttonRegrantAccess: Button
-    private lateinit var editScriptPath: EditText
     private lateinit var textLog: TextView
     private lateinit var scrollLog: ScrollView
     private lateinit var buttonRefreshLog: Button
@@ -143,7 +159,6 @@ class MainActivity : AppCompatActivity() {
         applyTheme()
 
         initViews()
-        setupScriptPath()
         setupListeners()
         refreshLogDisplay()
     }
@@ -171,39 +186,20 @@ class MainActivity : AppCompatActivity() {
         buttonRun = findViewById(R.id.btnRunScript)
         buttonEditRules = findViewById(R.id.btnEditRules)
         buttonViewLogs = findViewById(R.id.btnViewLogs)
-        buttonRegrantAccess = findViewById(R.id.btnRegrantAccess)
-        editScriptPath = findViewById(R.id.etScriptPath)
         textLog = findViewById(R.id.tvLog)
         scrollLog = findViewById(R.id.scrollLog)
         buttonRefreshLog = findViewById(R.id.btnRefreshLog)
         buttonClearLog = findViewById(R.id.btnClearLog)
-        mainScrollView = findViewById(R.id.rootLayout)
-    }
-
-    private fun setupScriptPath() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH) ?: DEFAULT_SCRIPT_PATH
-
-        editScriptPath.setText(savedPath)
-
-        editScriptPath.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val path = s?.toString()?.trim() ?: ""
-                if (path.isNotEmpty()) {
-                    prefs.edit().putString(PREF_KEY_SCRIPT_PATH, path).apply()
-                }
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
+        mainScrollView = findViewById(R.id.scrollContent)
     }
 
     private fun setupListeners() {
         findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            showGearMenu()
         }
 
         buttonRun.setOnClickListener {
+            animateSpring(it)
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
                 DEFAULT_SCRIPT_PATH
@@ -221,24 +217,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        buttonRegrantAccess.setOnClickListener {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val hintUri = DocumentsContract.buildDocumentUri(
-                        "com.android.externalstorage.documents",
-                        "primary:FileNavigator"
-                    )
-                    putExtra(DocumentsContract.EXTRA_INITIAL_URI, hintUri)
-                }
-            }
-            folderPermissionLauncher.launch(intent)
-        }
-
         buttonRefreshLog.setOnClickListener {
             refreshLogDisplay()
         }
@@ -254,6 +232,116 @@ class MainActivity : AppCompatActivity() {
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .show()
         }
+    }
+
+    private fun animateSpring(view: View) {
+        view.animate()
+            .scaleX(0.9f)
+            .scaleY(0.9f)
+            .setDuration(80)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(3f))
+                    .setDuration(250)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun regrantFolderAccess() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val hintUri = DocumentsContract.buildDocumentUri(
+                    "com.android.externalstorage.documents",
+                    "primary:FileNavigator"
+                )
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, hintUri)
+            }
+        }
+        folderPermissionLauncher.launch(intent)
+    }
+
+    private fun showGearMenu() {
+        val anchor = findViewById<ImageButton>(R.id.btnSettings)
+        val popupView = layoutInflater.inflate(R.layout.dialog_gear_menu, null)
+
+        val dark = isDarkMode()
+        val cardRoot = popupView.findViewById<LinearLayout>(R.id.dialogCardRoot)
+        val rowRegrant = popupView.findViewById<LinearLayout>(R.id.rowRegrant)
+        val rowSettings = popupView.findViewById<LinearLayout>(R.id.rowSettings)
+        val divider = popupView.findViewById<View>(R.id.dialogDivider)
+        val titles = listOf(
+            popupView.findViewById<TextView>(R.id.txtRegrantTitle),
+            popupView.findViewById<TextView>(R.id.txtSettingsTitle)
+        )
+        val subtitles = listOf(
+            popupView.findViewById<TextView>(R.id.txtRegrantSubtitle),
+            popupView.findViewById<TextView>(R.id.txtSettingsSubtitle)
+        )
+
+        val cardColor = if (dark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
+        val titleColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val subtitleColor = if (dark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
+        val dividerColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
+
+        // Apply compact rounded card background
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 14f * resources.displayMetrics.density
+            setColor(cardColor)
+        }
+        cardRoot?.background = bg
+        divider?.setBackgroundColor(dividerColor)
+
+        titles.forEach { it?.setTextColor(titleColor) }
+        subtitles.forEach { it?.setTextColor(subtitleColor) }
+
+        val popupWidth = (240 * resources.displayMetrics.density).toInt()
+        val popupWindow = PopupWindow(
+            popupView,
+            popupWidth,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            elevation = 12f * resources.displayMetrics.density
+            isOutsideTouchable = true
+            isFocusable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        rowRegrant?.setOnClickListener {
+            popupWindow.dismiss()
+            regrantFolderAccess()
+        }
+        rowSettings?.setOnClickListener {
+            popupWindow.dismiss()
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        // Align right edge of popup with right edge of gear button, right underneath it
+        val xOffset = anchor.width - popupWidth
+        val yOffset = (6 * resources.displayMetrics.density).toInt()
+        popupWindow.showAsDropDown(anchor, xOffset, yOffset)
+
+        popupView.scaleX = 0.85f
+        popupView.scaleY = 0.85f
+        popupView.alpha = 0f
+        popupView.pivotX = popupWidth.toFloat()
+        popupView.pivotY = 0f
+        popupView.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setInterpolator(android.view.animation.OvershootInterpolator(2.5f))
+            .setDuration(220)
+            .start()
     }
 
     private fun refreshLogDisplay() {

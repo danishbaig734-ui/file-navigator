@@ -29,6 +29,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Actions"
             android:textSize="13sp" />
@@ -40,6 +41,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Unmatched"
             android:textSize="13sp" />
@@ -51,6 +53,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Errors"
             android:textSize="13sp" />
@@ -62,6 +65,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
+        android:overScrollMode="always"
         android:background="#121212">
 
         <TextView
@@ -88,6 +92,7 @@
             style="?android:attr/buttonStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:foreground="?android:attr/selectableItemBackground"
             android:minHeight="48dp"
             android:text="Clear This Log"
             android:textSize="14sp" />

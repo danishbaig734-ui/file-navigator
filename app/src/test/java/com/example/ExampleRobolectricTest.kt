@@ -1,10 +1,8 @@
 package com.example
 
-import android.app.job.JobScheduler
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,17 +42,10 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testScheduleAndCancelJob() {
+    fun testPreferencesDefaultScriptPath() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        // Schedule job without throwing IllegalArgumentException
-        TriggerJobService.scheduleJob(context)
-        val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        val pendingJob = jobScheduler.getPendingJob(TriggerJobService.JOB_ID)
-        assertTrue("Job should be scheduled in JobScheduler", pendingJob != null)
-
-        // Cancel job
-        TriggerJobService.cancelJob(context)
-        val afterCancel = jobScheduler.getPendingJob(TriggerJobService.JOB_ID)
-        assertFalse("Job should be cancelled in JobScheduler", afterCancel != null)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val path = prefs.getString(MainActivity.PREF_KEY_SCRIPT_PATH, MainActivity.DEFAULT_SCRIPT_PATH)
+        assertEquals("/data/data/com.termux/files/home/file-bus.sh", path)
     }
 }

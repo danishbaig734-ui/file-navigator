@@ -32,4 +32,47 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="#2C2C2C" />
+
+    <TextView
+        android:id="@+id/lblScriptPath"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Termux Script Path"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:alpha="0.6"
+        android:text="Executable path to dispatch upon file events"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/etScriptPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/path_field_bg"
+        android:fontFamily="monospace"
+        android:hint="@string/default_script_path"
+        android:imeOptions="actionDone"
+        android:importantForAutofill="no"
+        android:inputType="textUri"
+        android:maxLines="1"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:singleLine="true"
+        android:text="@string/default_script_path"
+        android:textColor="#80D8FF"
+        android:textColorHint="#616161"
+        android:textSize="13sp" />
+
 </LinearLayout>
