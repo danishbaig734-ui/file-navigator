@@ -74,6 +74,16 @@
             android:text="View Logs"
             android:textSize="15sp" />
 
+        <Button
+            android:id="@+id/button_regrant_access"
+            style="?android:attr/buttonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:text="Re-grant Folder Access"
+            android:textSize="15sp" />
+
         <TextView
             android:id="@+id/label_script_path"
             android:layout_width="wrap_content"

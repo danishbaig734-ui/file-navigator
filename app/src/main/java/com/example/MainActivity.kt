@@ -4,8 +4,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.DocumentsContract
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -13,6 +16,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
@@ -26,11 +31,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonRun: Button
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
+    private lateinit var buttonRegrantAccess: Button
     private lateinit var editScriptPath: EditText
     private lateinit var textLog: TextView
     private lateinit var buttonRefreshLog: Button
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
+
+    private val folderPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.data
+        if (result.resultCode == RESULT_OK && uri != null) {
+            val flags = result.data?.flags ?: 0
+            val takeFlags = flags and (
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            ).let { granted ->
+                if (granted != 0) granted else (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            try {
+                contentResolver.takePersistableUriPermission(uri, takeFlags)
+            } catch (e: Exception) {
+                // ignore
+            }
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, uri.toString()).apply()
+            Toast.makeText(this, "Folder access updated", Toast.LENGTH_SHORT).show()
+            LogManager.append(this, "tree URI re-granted: $uri")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +94,7 @@ class MainActivity : AppCompatActivity() {
         buttonRun = findViewById(R.id.button_run)
         buttonEditRules = findViewById(R.id.button_edit_rules)
         buttonViewLogs = findViewById(R.id.button_view_logs)
+        buttonRegrantAccess = findViewById(R.id.button_regrant_access)
         editScriptPath = findViewById(R.id.edit_script_path)
         textLog = findViewById(R.id.text_log)
         buttonRefreshLog = findViewById(R.id.button_refresh_log)
@@ -107,6 +137,24 @@ class MainActivity : AppCompatActivity() {
         buttonViewLogs.setOnClickListener {
             val intent = Intent(this, LogViewerActivity::class.java)
             startActivity(intent)
+        }
+
+        buttonRegrantAccess.setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val hintUri = DocumentsContract.buildDocumentUri(
+                        "com.android.externalstorage.documents",
+                        "primary:FileNavigator"
+                    )
+                    putExtra(DocumentsContract.EXTRA_INITIAL_URI, hintUri)
+                }
+            }
+            folderPermissionLauncher.launch(intent)
         }
 
         buttonRefreshLog.setOnClickListener {

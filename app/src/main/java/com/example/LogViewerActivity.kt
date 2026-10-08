@@ -12,7 +12,78 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import java.io.File
+
+/**
+ * Lightweight SAF DocumentFile helper operating over tree URIs without external dependencies.
+ */
+class DocumentFile private constructor(
+    private val context: Context,
+    val treeUri: Uri,
+    val uri: Uri,
+    val isDirectory: Boolean
+) {
+    fun canRead(): Boolean = true
+    fun canWrite(): Boolean = true
+
+    fun findFile(name: String): DocumentFile? {
+        val docId = DocumentsContract.getDocumentId(uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE
+        )
+        return try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                if (idCol != -1 && nameCol != -1) {
+                    while (cursor.moveToNext()) {
+                        val displayName = cursor.getString(nameCol)
+                        if (displayName.equals(name, ignoreCase = true)) {
+                            val childId = cursor.getString(idCol)
+                            val mimeType = if (mimeCol != -1) cursor.getString(mimeCol) else ""
+                            val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+                            val childUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId)
+                            return DocumentFile(context, treeUri, childUri, isDir)
+                        }
+                    }
+                }
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun createFile(mimeType: String, displayName: String): DocumentFile? {
+        return try {
+            val docId = DocumentsContract.getDocumentId(uri)
+            val parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+            val newDocUri = DocumentsContract.createDocument(context.contentResolver, parentUri, mimeType, displayName)
+            if (newDocUri != null) {
+                DocumentFile(context, treeUri, newDocUri, isDirectory = false)
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    companion object {
+        fun fromTreeUri(context: Context, treeUri: Uri): DocumentFile? {
+            return try {
+                val docId = DocumentsContract.getTreeDocumentId(treeUri)
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                DocumentFile(context, treeUri, docUri, isDirectory = true)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+}
 
 class LogViewerActivity : AppCompatActivity() {
 
@@ -70,8 +141,7 @@ class LogViewerActivity : AppCompatActivity() {
                 .setTitle("Clear Log")
                 .setMessage("Clear ${currentTab.title} log?")
                 .setPositiveButton("Clear") { _, _ ->
-                    clearLogFile(currentTab.fileName)
-                    textLogContent.text = "(no entries)"
+                    clearCurrentLog()
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -99,109 +169,73 @@ class LogViewerActivity : AppCompatActivity() {
     }
 
     private fun loadCurrentLog() {
-        val lines = readLogFile(currentTab.fileName)
-        if (lines.isNullOrEmpty()) {
-            textLogContent.text = "(no entries)"
-        } else {
-            val lastLines = if (lines.size > 200) lines.takeLast(200) else lines
-            val joined = lastLines.joinToString("\n")
-            textLogContent.text = if (joined.isBlank()) "(no entries)" else joined
+        val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val uriString = prefs.getString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, null)
+        if (uriString == null) {
+            textLogContent.text = "(tree URI invalid — re-grant folder access)"
+            LogManager.append(this, "LogViewer: tree URI null")
+            return
         }
+
+        val treeUri = Uri.parse(uriString)
+        val root = DocumentFile.fromTreeUri(this, treeUri)
+        if (root == null || !root.canRead()) {
+            textLogContent.text = "(tree URI invalid — re-grant folder access)"
+            LogManager.append(this, "LogViewer: tree URI null")
+            return
+        }
+
+        val logsDir = root.findFile("logs")
+        if (logsDir == null || !logsDir.isDirectory) {
+            textLogContent.text = "(logs folder not found)"
+            LogManager.append(this, "LogViewer: logs folder missing in tree $treeUri")
+            return
+        }
+
+        val fileName = currentTab.fileName
+        val logFile = logsDir.findFile(fileName)
+        if (logFile == null) {
+            textLogContent.text = "(no entries)"
+            LogManager.append(this, "LogViewer: $fileName missing")
+            return
+        }
+
+        try {
+            val lines = contentResolver.openInputStream(logFile.uri)?.bufferedReader()?.use { reader ->
+                reader.readLines()
+            } ?: emptyList()
+
+            LogManager.append(this, "LogViewer: read ${lines.size} lines from $fileName")
+
+            if (lines.isEmpty()) {
+                textLogContent.text = "(no entries)"
+            } else {
+                val text = lines.takeLast(200).joinToString("\n")
+                textLogContent.text = if (text.isBlank()) "(no entries)" else text
+            }
+        } catch (e: Exception) {
+            textLogContent.text = "(no entries)"
+            LogManager.append(this, "LogViewer: read failed from $fileName: ${e.message}")
+        }
+
         scrollLog.post {
             scrollLog.fullScroll(View.FOCUS_DOWN)
         }
     }
 
-    private fun getLogDocumentUri(fileName: String): Uri? {
+    private fun clearCurrentLog() {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val uriString = prefs.getString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, null) ?: return null
-        return try {
-            val treeUri = Uri.parse(uriString)
-            val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
-
-            var logsDocId: String? = null
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeDocId)
-            val projection = arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME
-            )
-            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                while (cursor.moveToNext()) {
-                    if (cursor.getString(nameCol).equals("logs", ignoreCase = true)) {
-                        logsDocId = cursor.getString(idCol)
-                        break
-                    }
-                }
-            } ?: return null
-
-            if (logsDocId == null) return null
-
-            var fileDocId: String? = null
-            val logsChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, logsDocId)
-            contentResolver.query(logsChildrenUri, projection, null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                while (cursor.moveToNext()) {
-                    if (cursor.getString(nameCol).equals(fileName, ignoreCase = true)) {
-                        fileDocId = cursor.getString(idCol)
-                        break
-                    }
-                }
+        val uriString = prefs.getString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, null) ?: return
+        val treeUri = Uri.parse(uriString)
+        val root = DocumentFile.fromTreeUri(this, treeUri) ?: return
+        val logsDir = root.findFile("logs") ?: return
+        val logFile = logsDir.findFile(currentTab.fileName) ?: return
+        try {
+            contentResolver.openOutputStream(logFile.uri, "wt")?.use { stream ->
+                stream.write(ByteArray(0))
+                stream.flush()
             }
-
-            if (fileDocId != null) {
-                DocumentsContract.buildDocumentUriUsingTree(treeUri, fileDocId)
-            } else {
-                null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun readLogFile(fileName: String): List<String>? {
-        val docUri = getLogDocumentUri(fileName)
-        if (docUri != null) {
-            try {
-                contentResolver.openInputStream(docUri)?.use { stream ->
-                    return stream.bufferedReader(Charsets.UTF_8).readLines()
-                }
-            } catch (_: Exception) {}
-        }
-
-        val file = File("/sdcard/FileNavigator/logs", fileName)
-        if (file.exists() && file.canRead()) {
-            try {
-                return file.readLines(Charsets.UTF_8)
-            } catch (_: Exception) {}
-        }
-
-        return null
-    }
-
-    private fun clearLogFile(fileName: String): Boolean {
-        var cleared = false
-        val docUri = getLogDocumentUri(fileName)
-        if (docUri != null) {
-            try {
-                contentResolver.openOutputStream(docUri, "wt")?.use { stream ->
-                    stream.write(ByteArray(0))
-                    stream.flush()
-                }
-                cleared = true
-            } catch (_: Exception) {}
-        }
-
-        val file = File("/sdcard/FileNavigator/logs", fileName)
-        if (file.exists() && file.canWrite()) {
-            try {
-                file.writeText("")
-                cleared = true
-            } catch (_: Exception) {}
-        }
-
-        return cleared
+        } catch (_: Exception) {}
+        textLogContent.text = "(no entries)"
     }
 }

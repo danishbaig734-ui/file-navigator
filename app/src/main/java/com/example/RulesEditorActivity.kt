@@ -157,50 +157,11 @@ class RulesEditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun findRulesDocumentUri(treeUri: Uri): Uri? {
-        return try {
-            val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeDocId)
-            val projection = arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME
-            )
-            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                if (idCol != -1 && nameCol != -1) {
-                    while (cursor.moveToNext()) {
-                        val name = cursor.getString(nameCol)
-                        if (name.equals("rules.conf", ignoreCase = true)) {
-                            val docId = cursor.getString(idCol)
-                            return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                        }
-                    }
-                }
-            }
-            null
-        } catch (e: Exception) {
-            Log.e(TAG, "findRulesDocumentUri failed: ${e.message}", e)
-            null
-        }
-    }
-
-    private fun getOrCreateRulesDocumentUri(treeUri: Uri): Uri? {
-        findRulesDocumentUri(treeUri)?.let { return it }
-        return try {
-            val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
-            val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
-            DocumentsContract.createDocument(contentResolver, parentDocUri, "text/plain", "rules.conf")
-        } catch (e: Exception) {
-            Log.e(TAG, "getOrCreateRulesDocumentUri failed: ${e.message}", e)
-            null
-        }
-    }
-
     private fun readRulesFile(treeUri: Uri): String? {
-        val docUri = findRulesDocumentUri(treeUri) ?: return null
+        val root = DocumentFile.fromTreeUri(this, treeUri) ?: return null
+        val file = root.findFile("rules.conf") ?: return null
         return try {
-            contentResolver.openInputStream(docUri)?.use { stream ->
+            contentResolver.openInputStream(file.uri)?.use { stream ->
                 stream.bufferedReader(Charsets.UTF_8).readText()
             }
         } catch (e: Exception) {
@@ -224,16 +185,23 @@ class RulesEditorActivity : AppCompatActivity() {
         val content = editRules.text?.toString() ?: ""
 
         return try {
-            val docUri = getOrCreateRulesDocumentUri(treeUri)
-            if (docUri == null) {
+            val root = DocumentFile.fromTreeUri(this, treeUri)
+            if (root == null) {
+                val reason = "invalid tree URI"
+                LogManager.log(this, "rules.conf save failed: $reason")
+                Toast.makeText(this, "Save failed: $reason", Toast.LENGTH_LONG).show()
+                return false
+            }
+
+            val file = root.findFile("rules.conf") ?: root.createFile("text/plain", "rules.conf")
+            if (file == null) {
                 val reason = "unable to create or locate rules.conf"
                 LogManager.log(this, "rules.conf save failed: $reason")
                 Toast.makeText(this, "Save failed: $reason", Toast.LENGTH_LONG).show()
                 return false
             }
 
-            val outputStream = contentResolver.openOutputStream(docUri, "wt")
-                ?: contentResolver.openOutputStream(docUri, "w")
+            val outputStream = contentResolver.openOutputStream(file.uri, "wt")
                 ?: throw IllegalStateException("Output stream is null")
 
             outputStream.use { stream ->
