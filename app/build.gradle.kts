@@ -60,6 +60,7 @@ dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.appcompat)
   implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+  implementation("androidx.recyclerview:recyclerview:1.3.2")
 
   testImplementation(libs.junit)
   testImplementation(libs.androidx.core)

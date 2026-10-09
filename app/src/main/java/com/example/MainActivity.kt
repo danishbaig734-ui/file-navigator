@@ -20,13 +20,17 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 /**
  * Main Activity of the application.
@@ -86,24 +90,29 @@ class MainActivity : AppCompatActivity() {
         // 7. Secondary buttons (and refresh/clear log buttons)
         val editRulesBtn = findViewById<Button>(R.id.btnEditRules)
         val viewLogsBtn = findViewById<Button>(R.id.btnViewLogs)
-        val secBtnTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
 
         if (dark) {
-            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple)
+            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple_white)
+            editRulesBtn.setTextColor(0xFF000000.toInt())
             viewLogsBtn.setBackgroundResource(R.drawable.rounded_button_ripple)
+            viewLogsBtn.setTextColor(0xFFFFFFFF.toInt())
         } else {
-            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple_light)
+            editRulesBtn.setBackgroundResource(R.drawable.rounded_button_ripple_black)
+            editRulesBtn.setTextColor(0xFFFFFFFF.toInt())
             viewLogsBtn.setBackgroundResource(R.drawable.rounded_button_ripple_light)
+            viewLogsBtn.setTextColor(0xFF000000.toInt())
         }
-        editRulesBtn.setTextColor(secBtnTextColor)
-        viewLogsBtn.setTextColor(secBtnTextColor)
 
+        val secBtnTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
         val secBtnBgColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
         listOf(
             findViewById<Button>(R.id.btnRefreshLog),
             findViewById<Button>(R.id.btnClearLog)
         ).forEach { btn ->
-            (btn.background.mutate() as? GradientDrawable)?.setColor(secBtnBgColor)
+            (btn.background.mutate() as? GradientDrawable)?.apply {
+                cornerRadius = 20f * resources.displayMetrics.density
+                setColor(secBtnBgColor)
+            }
             btn.setTextColor(secBtnTextColor)
         }
 
@@ -111,20 +120,25 @@ class MainActivity : AppCompatActivity() {
         val labelColor = if (dark) 0xFFCCCCCC.toInt() else 0xFF555555.toInt()
         findViewById<TextView>(R.id.lblEventLog).setTextColor(labelColor)
 
-        // 9. Log fields
+        // 9. Log fields (styled RecyclerView)
         val fieldBgColor = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
-        val fieldTextColor = if (dark) 0xFFF5F5F5.toInt() else 0xFF1A1A1A.toInt()
 
-        val logScroll = findViewById<View>(R.id.scrollLog)
-        (logScroll.background.mutate() as? GradientDrawable)?.setColor(fieldBgColor)
-        findViewById<TextView>(R.id.tvLog).setTextColor(fieldTextColor)
+        val logRecycler = findViewById<RecyclerView>(R.id.rvLog)
+        (logRecycler.background.mutate() as? GradientDrawable)?.apply {
+            cornerRadius = 28f * resources.displayMetrics.density
+            setColor(fieldBgColor)
+        }
+        logAdapter?.let { adapter ->
+            val content = LogManager.readLog(this)
+            adapter.update(LogParser.parseContent(content), dark)
+        }
     }
 
     private lateinit var buttonRun: ImageButton
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
-    private lateinit var textLog: TextView
-    private lateinit var scrollLog: ScrollView
+    private lateinit var rvLog: RecyclerView
+    private var logAdapter: LogEntryAdapter? = null
     private lateinit var buttonRefreshLog: Button
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
@@ -166,12 +180,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyTheme()
-        LogManager.setListener { updatedText ->
+        LogManager.setListener { _ ->
             runOnUiThread {
-                textLog.text = updatedText
-                scrollLog.post {
-                    scrollLog.fullScroll(View.FOCUS_DOWN)
-                }
+                refreshLogDisplay()
             }
         }
         refreshLogDisplay()
@@ -186,8 +197,8 @@ class MainActivity : AppCompatActivity() {
         buttonRun = findViewById(R.id.btnRunScript)
         buttonEditRules = findViewById(R.id.btnEditRules)
         buttonViewLogs = findViewById(R.id.btnViewLogs)
-        textLog = findViewById(R.id.tvLog)
-        scrollLog = findViewById(R.id.scrollLog)
+        rvLog = findViewById(R.id.rvLog)
+        rvLog.layoutManager = LinearLayoutManager(this)
         buttonRefreshLog = findViewById(R.id.btnRefreshLog)
         buttonClearLog = findViewById(R.id.btnClearLog)
         mainScrollView = findViewById(R.id.scrollContent)
@@ -227,24 +238,37 @@ class MainActivity : AppCompatActivity() {
                 .setMessage(R.string.dialog_clear_message)
                 .setPositiveButton(R.string.dialog_clear_confirm) { _, _ ->
                     LogManager.clearLog(this)
-                    textLog.text = "No events recorded yet."
+                    refreshLogDisplay()
                 }
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .show()
         }
+
+        val logTouchListener = View.OnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            false
+        }
+        rvLog.setOnTouchListener(logTouchListener)
     }
 
     private fun animateSpring(view: View) {
         view.animate()
-            .scaleX(0.9f)
-            .scaleY(0.9f)
-            .setDuration(80)
+            .scaleX(0.78f)
+            .scaleY(0.78f)
+            .setDuration(90)
             .withEndAction {
                 view.animate()
                     .scaleX(1f)
                     .scaleY(1f)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(3f))
-                    .setDuration(250)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(5.5f))
+                    .setDuration(320)
                     .start()
             }
             .start()
@@ -330,8 +354,8 @@ class MainActivity : AppCompatActivity() {
         val yOffset = (6 * resources.displayMetrics.density).toInt()
         popupWindow.showAsDropDown(anchor, xOffset, yOffset)
 
-        popupView.scaleX = 0.85f
-        popupView.scaleY = 0.85f
+        popupView.scaleX = 0.70f
+        popupView.scaleY = 0.70f
         popupView.alpha = 0f
         popupView.pivotX = popupWidth.toFloat()
         popupView.pivotY = 0f
@@ -339,16 +363,25 @@ class MainActivity : AppCompatActivity() {
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setInterpolator(android.view.animation.OvershootInterpolator(2.5f))
-            .setDuration(220)
+            .setInterpolator(android.view.animation.OvershootInterpolator(4f))
+            .setDuration(280)
             .start()
     }
 
     private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
-        textLog.text = content
-        scrollLog.post {
-            scrollLog.fullScroll(View.FOCUS_DOWN)
+        val entries = LogParser.parseContent(content)
+        val dark = isDarkMode()
+        if (logAdapter == null) {
+            logAdapter = LogEntryAdapter(entries, dark)
+            rvLog.adapter = logAdapter
+        } else {
+            logAdapter?.update(entries, dark)
+        }
+        if (entries.isNotEmpty()) {
+            rvLog.post {
+                rvLog.scrollToPosition(entries.size - 1)
+            }
         }
     }
 

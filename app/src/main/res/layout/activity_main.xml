@@ -108,7 +108,7 @@
                 android:layout_height="52dp"
                 android:layout_marginTop="36dp"
                 android:layout_marginEnd="6dp"
-                android:background="@drawable/rounded_button_ripple"
+                android:background="@drawable/rounded_button_ripple_white"
                 android:text="Edit"
                 android:textSize="15sp"
                 app:layout_constraintEnd_toStartOf="@id/btnViewLogs"
@@ -141,41 +141,31 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/btnViewLogs" />
 
-            <ScrollView
-                android:id="@+id/scrollLog"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvLog"
                 android:layout_width="0dp"
                 android:layout_height="220dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/log_field_bg"
-                android:fillViewport="true"
-                android:nestedScrollingEnabled="true"
+                android:clipToPadding="false"
                 android:overScrollMode="always"
+                android:padding="4dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/lblEventLog">
-
-                <TextView
-                    android:id="@+id/tvLog"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:padding="12dp"
-                    android:text="No events recorded yet."
-                    android:textIsSelectable="true"
-                    android:textSize="11sp" />
-            </ScrollView>
+                app:layout_constraintTop_toBottomOf="@id/lblEventLog" />
 
             <LinearLayout
                 android:id="@+id/rowLogButtons"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="20dp"
                 android:gravity="end"
                 android:orientation="horizontal"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/scrollLog">
+                app:layout_constraintTop_toBottomOf="@id/rvLog"
+                app:layout_constraintVertical_bias="0">
 
                 <Button
                     android:id="@+id/btnRefreshLog"
