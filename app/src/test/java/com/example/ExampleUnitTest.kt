@@ -58,4 +58,53 @@ class ExampleUnitTest {
     assertEquals("No events recorded yet.", entries[0].message)
     assertEquals(LogType.NEUTRAL, entries[0].type)
   }
+
+  @Test
+  fun testLogParser_startServiceAndBindServiceAreSuccess() {
+    val startEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux started via startService")
+    assertEquals(LogType.SUCCESS, startEntry.type)
+
+    val bindEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux bound via bindService")
+    assertEquals(LogType.SUCCESS, bindEntry.type)
+
+    val doneEntry = LogParser.parseLine("2026-10-08 17:10:14 — === Done (all rules applied)")
+    assertEquals(LogType.SUCCESS, doneEntry.type)
+
+    val runStartedEntry = LogParser.parseLine("2026-10-08 17:10:14 — === Run started ===")
+    assertEquals(LogType.SUCCESS, runStartedEntry.type)
+  }
+
+  @Test
+  fun testLogParser_errorPrecedenceOverSuccess() {
+    // Contains "Termux" and "intent failed" -> error should take precedence
+    val failedEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux intent failed")
+    assertEquals(LogType.ERROR, failedEntry.type)
+
+    val blockedEntry = LogParser.parseLine("2026-10-08 17:10:14 — startService blocked: IllegalStateException")
+    assertEquals(LogType.ERROR, blockedEntry.type)
+
+    val secException = LogParser.parseLine("2026-10-08 17:10:14 — SecurityException: not permitted")
+    assertEquals(LogType.ERROR, secException.type)
+
+    val saveFailed = LogParser.parseLine("2026-10-08 17:10:14 — rules.conf save failed")
+    assertEquals(LogType.ERROR, saveFailed.type)
+  }
+
+  @Test
+  fun testLogParser_neutralCases() {
+    val savedEntry = LogParser.parseLine("2026-10-08 17:10:14 — rules.conf saved")
+    assertEquals(LogType.NEUTRAL, savedEntry.type)
+
+    val collisionEntry = LogParser.parseLine("2026-10-08 17:10:14 — COLLISION: file already exists")
+    assertEquals(LogType.NEUTRAL, collisionEntry.type)
+
+    val removedEntry = LogParser.parseLine("2026-10-08 17:10:14 — REMOVED empty folder")
+    assertEquals(LogType.NEUTRAL, removedEntry.type)
+
+    val regrantedEntry = LogParser.parseLine("2026-10-08 17:10:14 — tree URI re-granted")
+    assertEquals(LogType.NEUTRAL, regrantedEntry.type)
+
+    val ignoreSaved = LogParser.parseLine("2026-10-08 17:10:14 — ignore list saved")
+    assertEquals(LogType.NEUTRAL, ignoreSaved.type)
+  }
 }

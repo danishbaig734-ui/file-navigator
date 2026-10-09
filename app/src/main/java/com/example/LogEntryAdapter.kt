@@ -28,13 +28,23 @@ class LogEntryAdapter(
         val entry = items[position]
         holder.tvTimestamp.text = entry.timestamp
 
-        if (isDark) {
-            holder.tvTimestamp.setBackgroundResource(R.drawable.log_pill_bg)
-            holder.tvTimestamp.setTextColor(0xFFFFFFFF.toInt())
-        } else {
-            holder.tvTimestamp.setBackgroundResource(R.drawable.log_pill_bg_light)
-            holder.tvTimestamp.setTextColor(0xFF222222.toInt())
+        val pillBg = when (entry.type) {
+            LogType.SUCCESS -> if (isDark) R.drawable.log_pill_success_dark else R.drawable.log_pill_success_light
+            LogType.ERROR -> if (isDark) R.drawable.log_pill_error_dark else R.drawable.log_pill_error_light
+            LogType.NEUTRAL -> if (isDark) R.drawable.log_pill_neutral_dark else R.drawable.log_pill_neutral_light
         }
+        holder.tvTimestamp.setBackgroundResource(pillBg)
+
+        val pillTextColor = if (isDark) {
+            0xFFFFFFFF.toInt()
+        } else {
+            when (entry.type) {
+                LogType.SUCCESS -> 0xFF1B5E20.toInt()
+                LogType.ERROR -> 0xFFB71C1C.toInt()
+                LogType.NEUTRAL -> 0xFF222222.toInt()
+            }
+        }
+        holder.tvTimestamp.setTextColor(pillTextColor)
 
         holder.tvMessage.text = entry.message
         val messageColor = when (entry.type) {

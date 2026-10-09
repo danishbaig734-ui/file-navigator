@@ -34,10 +34,22 @@ object LogParser {
     }
 
     fun determineType(message: String): LogType {
-        val upper = message.uppercase()
         return when {
-            upper.contains("FAILED") || upper.contains("BLOCKED") || upper.contains("ERROR") -> LogType.ERROR
-            upper.contains("MOVED") || upper.contains("DONE") || upper.contains("RUN STARTED") -> LogType.SUCCESS
+            message.contains("FAILED") ||
+            message.contains("blocked") ||
+            message.contains("failed") ||
+            message.contains("SecurityException") ||
+            message.contains("Exception") ||
+            message.contains("Error") ||
+            message.contains("error") ||
+            message.startsWith("rules.conf save failed") -> LogType.ERROR
+
+            (!message.contains("REMOVED") && message.contains("MOVED")) ||
+            message.contains("startService") ||
+            message.contains("bindService") ||
+            message.startsWith("=== Done") ||
+            message.startsWith("=== Run started") -> LogType.SUCCESS
+
             else -> LogType.NEUTRAL
         }
     }

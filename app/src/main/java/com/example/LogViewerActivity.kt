@@ -173,7 +173,6 @@ class LogViewerActivity : AppCompatActivity() {
         val uriString = prefs.getString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, null)
         if (uriString == null) {
             textLogContent.text = "(tree URI invalid — re-grant folder access)"
-            LogManager.append(this, "LogViewer: tree URI null")
             return
         }
 
@@ -181,14 +180,12 @@ class LogViewerActivity : AppCompatActivity() {
         val root = DocumentFile.fromTreeUri(this, treeUri)
         if (root == null || !root.canRead()) {
             textLogContent.text = "(tree URI invalid — re-grant folder access)"
-            LogManager.append(this, "LogViewer: tree URI null")
             return
         }
 
         val logsDir = root.findFile("logs")
         if (logsDir == null || !logsDir.isDirectory) {
             textLogContent.text = "(logs folder not found)"
-            LogManager.append(this, "LogViewer: logs folder missing in tree $treeUri")
             return
         }
 
@@ -196,7 +193,6 @@ class LogViewerActivity : AppCompatActivity() {
         val logFile = logsDir.findFile(fileName)
         if (logFile == null) {
             textLogContent.text = "(no entries)"
-            LogManager.append(this, "LogViewer: $fileName missing")
             return
         }
 
@@ -205,17 +201,14 @@ class LogViewerActivity : AppCompatActivity() {
                 reader.readLines()
             } ?: emptyList()
 
-            LogManager.append(this, "LogViewer: read ${lines.size} lines from $fileName")
-
             if (lines.isEmpty()) {
                 textLogContent.text = "(no entries)"
             } else {
                 val text = lines.takeLast(200).joinToString("\n")
                 textLogContent.text = if (text.isBlank()) "(no entries)" else text
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             textLogContent.text = "(no entries)"
-            LogManager.append(this, "LogViewer: read failed from $fileName: ${e.message}")
         }
 
         scrollLog.post {
