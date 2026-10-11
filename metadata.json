@@ -1,5 +1,5 @@
 {
-  "name": "Termux Trigger",
+  "name": "File Navigator",
   "description": "Silent background trigger that invokes Termux scripts on file changes via JobScheduler.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

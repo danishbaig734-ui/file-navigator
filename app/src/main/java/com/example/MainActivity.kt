@@ -26,6 +26,8 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.PopupWindow
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -166,9 +168,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
+    private var permissionDialog: AlertDialog? = null
+
+    private fun hasRunCommandPermission(): Boolean =
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            RUN_COMMAND_PERMISSION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    private fun checkRunCommandPermission() {
+        if (!hasRunCommandPermission()) {
+            showPermissionDialog()
+        }
+    }
+
+    private fun showPermissionDialog() {
+        if (isFinishing || isDestroyed || permissionDialog?.isShowing == true) return
+
+        permissionDialog = AlertDialog.Builder(this)
+            .setTitle(R.string.permission_dialog_title)
+            .setMessage(R.string.permission_dialog_message)
+            .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(intent)
+            }
+            .setNegativeButton(R.string.permission_dialog_dismiss, null)
+            .show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        checkRunCommandPermission()
 
         applyTheme()
 
@@ -180,6 +215,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         applyTheme()
+        if (hasRunCommandPermission()) {
+            permissionDialog?.dismiss()
+            permissionDialog = null
+        }
         LogManager.setListener { _ ->
             runOnUiThread {
                 refreshLogDisplay()
@@ -191,6 +230,8 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         LogManager.setListener(null)
+        permissionDialog?.dismiss()
+        permissionDialog = null
     }
 
     private fun initViews() {
@@ -209,8 +250,15 @@ class MainActivity : AppCompatActivity() {
             showGearMenu()
         }
 
+        attachPressScale(buttonRun, grow = 1.08f)
+        attachPressScale(buttonEditRules, grow = 1.04f)
+        attachPressScale(buttonViewLogs, grow = 1.04f)
+
         buttonRun.setOnClickListener {
-            animateSpring(it)
+            if (!hasRunCommandPermission()) {
+                showPermissionDialog()
+                return@setOnClickListener
+            }
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
                 DEFAULT_SCRIPT_PATH
@@ -233,15 +281,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         buttonClearLog.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.dialog_clear_title)
-                .setMessage(R.string.dialog_clear_message)
-                .setPositiveButton(R.string.dialog_clear_confirm) { _, _ ->
-                    LogManager.clearLog(this)
-                    refreshLogDisplay()
-                }
-                .setNegativeButton(R.string.dialog_cancel, null)
-                .show()
+            showCustomClearLogDialog()
         }
 
         val logTouchListener = View.OnTouchListener { view, event ->
@@ -258,19 +298,108 @@ class MainActivity : AppCompatActivity() {
         rvLog.setOnTouchListener(logTouchListener)
     }
 
-    private fun animateSpring(view: View) {
-        view.animate()
-            .scaleX(0.78f)
-            .scaleY(0.78f)
-            .setDuration(90)
-            .withEndAction {
-                view.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(5.5f))
-                    .setDuration(320)
-                    .start()
+    private fun attachPressScale(view: View, grow: Float = 1.06f) {
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate()
+                        .scaleX(grow)
+                        .scaleY(grow)
+                        .setDuration(90)
+                        .setInterpolator(DecelerateInterpolator())
+                        .start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(120)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .start()
+                }
             }
+            false // allow click listener to receive the event
+        }
+    }
+
+    private fun showCustomClearLogDialog() {
+        val dark = isDarkMode()
+        val dialogView = layoutInflater.inflate(R.layout.dialog_clear_log, null)
+        val cardRoot = dialogView.findViewById<LinearLayout>(R.id.dialogCardRoot)
+        val txtTitle = dialogView.findViewById<TextView>(R.id.txtDialogTitle)
+        val txtMessage = dialogView.findViewById<TextView>(R.id.txtDialogMessage)
+        val btnCancel = dialogView.findViewById<Button>(R.id.btnDialogCancel)
+        val btnConfirm = dialogView.findViewById<Button>(R.id.btnDialogConfirm)
+
+        val cardBgColor = if (dark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
+        val titleColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val messageColor = if (dark) 0xFFAAAAAA.toInt() else 0xFF555555.toInt()
+        val cancelTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+
+        cardRoot?.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 16f * resources.displayMetrics.density
+            setColor(cardBgColor)
+        }
+
+        txtTitle?.setTextColor(titleColor)
+        txtMessage?.setTextColor(messageColor)
+        btnCancel?.setTextColor(cancelTextColor)
+
+        if (dark) {
+            btnCancel?.setBackgroundResource(R.drawable.dialog_button_neutral_dark)
+            btnConfirm?.setBackgroundResource(R.drawable.dialog_button_danger_dark)
+        } else {
+            btnCancel?.setBackgroundResource(R.drawable.dialog_button_neutral_light)
+            btnConfirm?.setBackgroundResource(R.drawable.dialog_button_danger_light)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        btnCancel?.let { attachPressScale(it, grow = 1.05f) }
+        btnConfirm?.let { attachPressScale(it, grow = 1.05f) }
+
+        fun dismissWithAnimation() {
+            cardRoot.animate()
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .alpha(0f)
+                .setDuration(120)
+                .setInterpolator(AccelerateDecelerateInterpolator())
+                .withEndAction {
+                    try {
+                        dialog.dismiss()
+                    } catch (_: Exception) {}
+                }
+                .start()
+        }
+
+        btnCancel?.setOnClickListener {
+            dismissWithAnimation()
+        }
+
+        btnConfirm?.setOnClickListener {
+            LogManager.clearLog(this)
+            refreshLogDisplay()
+            dismissWithAnimation()
+        }
+
+        dialog.show()
+
+        // Smooth open animation
+        cardRoot.scaleX = 0.90f
+        cardRoot.scaleY = 0.90f
+        cardRoot.alpha = 0f
+        cardRoot.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setDuration(180)
+            .setInterpolator(DecelerateInterpolator())
             .start()
     }
 

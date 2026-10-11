@@ -17,7 +17,7 @@ class ExampleRobolectricTest {
     fun testAppNameString() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Termux Trigger", appName)
+        assertEquals("File Navigator", appName)
     }
 
     @Test

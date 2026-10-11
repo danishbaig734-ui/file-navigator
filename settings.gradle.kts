@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Termux Trigger"
+rootProject.name = "File Navigator"
 
 include(":app")

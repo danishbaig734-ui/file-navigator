@@ -39,16 +39,16 @@ class LogEntryAdapter(
             0xFFFFFFFF.toInt()
         } else {
             when (entry.type) {
-                LogType.SUCCESS -> 0xFF1B5E20.toInt()
-                LogType.ERROR -> 0xFFB71C1C.toInt()
-                LogType.NEUTRAL -> 0xFF222222.toInt()
+                LogType.SUCCESS -> 0xFF205C3B.toInt()
+                LogType.ERROR -> 0xFF9C2020.toInt()
+                LogType.NEUTRAL -> 0xFF333333.toInt()
             }
         }
         holder.tvTimestamp.setTextColor(pillTextColor)
 
         holder.tvMessage.text = entry.message
         val messageColor = when (entry.type) {
-            LogType.SUCCESS -> if (isDark) 0xFF4CAF50.toInt() else 0xFF2E7D32.toInt()
+            LogType.SUCCESS -> if (isDark) 0xFF72B08B.toInt() else 0xFF2D6A4F.toInt()
             LogType.ERROR -> if (isDark) 0xFFEF5350.toInt() else 0xFFC62828.toInt()
             LogType.NEUTRAL -> if (isDark) 0xFFA0A0A0.toInt() else 0xFF666666.toInt()
         }

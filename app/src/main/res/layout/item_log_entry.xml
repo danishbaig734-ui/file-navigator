@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
         android:background="@drawable/log_pill_bg"
-        android:fontFamily="monospace"
+        android:fontFamily="@font/anta"
         android:maxLines="1"
         android:paddingHorizontal="8dp"
         android:paddingVertical="3dp"
@@ -25,7 +25,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:fontFamily="monospace"
+        android:fontFamily="@font/anta"
         android:lineSpacingMultiplier="1.1"
         android:textSize="11sp" />
 

@@ -1,5 +1,9 @@
 <resources>
-    <string name="app_name">Termux Trigger</string>
+    <string name="app_name">File Navigator</string>
+    <string name="permission_dialog_title">Permission Required</string>
+    <string name="permission_dialog_message">File Navigator needs the Termux RUN_COMMAND permission to execute file-bus.sh.\n\nPlease enable it in Settings &gt; Apps &gt; File Navigator &gt; Permissions &gt; Additional permissions.</string>
+    <string name="permission_dialog_open_settings">Open Settings</string>
+    <string name="permission_dialog_dismiss">Dismiss</string>
     <string name="trigger_state_on">Trigger: ON</string>
     <string name="trigger_state_off">Trigger: OFF</string>
     <string name="button_turn_on">Turn ON</string>
