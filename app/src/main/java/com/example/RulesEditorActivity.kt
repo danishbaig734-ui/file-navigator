@@ -11,7 +11,9 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.DocumentsContract
 import android.text.Editable
 import android.text.TextWatcher
@@ -63,12 +65,22 @@ class RulesEditorActivity : AppCompatActivity() {
     private var isEditMode: Boolean = false
     private var defaultKeyListener: KeyListener? = null
     private var isHighlighting: Boolean = false
+    private var cachedDarkMode: Boolean = true
 
-    private fun isDarkMode(): Boolean =
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DARK_MODE, true)
+    private val highlightHandler = Handler(Looper.getMainLooper())
+    private val highlightRunnable = Runnable {
+        triggerSyntaxHighlighting()
+    }
+
+    private fun isDarkMode(): Boolean = cachedDarkMode
+
+    private fun updateCachedDarkMode(): Boolean {
+        cachedDarkMode = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DARK_MODE, true)
+        return cachedDarkMode
+    }
 
     private fun applyTheme() {
-        val dark = isDarkMode()
+        val dark = updateCachedDarkMode()
 
         // 1. Root & Header backgrounds
         val bgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
@@ -123,8 +135,8 @@ class RulesEditorActivity : AppCompatActivity() {
         editRules.setHintTextColor(hintColor)
 
         // 9. Quick snippet chips
-        val chipBgColor = if (dark) 0xFF1C1C1C.toInt() else 0xFFE8E8E8.toInt()
-        val chipTextColor = if (dark) 0xFF80D8FF.toInt() else 0xFF005B94.toInt()
+        val chipBgColor = if (dark) 0xFF242424.toInt() else 0xFFEAEAEA.toInt()
+        val chipTextColor = if (dark) 0xFFE0E0E0.toInt() else 0xFF1A1A1A.toInt()
         val labelColor = if (dark) 0xFFAAAAAA.toInt() else 0xFF777777.toInt()
         findViewById<TextView>(R.id.lblQuickInsert).setTextColor(labelColor)
 
@@ -168,32 +180,28 @@ class RulesEditorActivity : AppCompatActivity() {
 
     private fun updateStatusPill(modified: Boolean, dark: Boolean = isDarkMode()) {
         isModified = modified
-        val statusBg = if (dark) 0xFF222222.toInt() else 0xFFEAEAEA.toInt()
+        val statusBg = if (dark) 0xFF222222.toInt() else 0xFFE5E5E5.toInt()
         (txtStatusPill.background.mutate() as? GradientDrawable)?.setColor(statusBg)
-        if (modified) {
-            txtStatusPill.text = "Modified •"
-            txtStatusPill.setTextColor(if (dark) 0xFFFFB74D.toInt() else 0xFFE65100.toInt())
-        } else {
-            txtStatusPill.text = "Saved ✓"
-            txtStatusPill.setTextColor(if (dark) 0xFF81C784.toInt() else 0xFF2E7D32.toInt())
-        }
+        val statusTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        txtStatusPill.setTextColor(statusTextColor)
+        txtStatusPill.text = if (modified) "Modified •" else "Saved ✓"
     }
 
     private fun updateModePillUI() {
         val dark = isDarkMode()
         if (isEditMode) {
-            txtModePill.text = "✏️ EDITING • Tap outside to lock"
-            val bg = if (dark) 0xFF2D1F10.toInt() else 0xFFFFF3E0.toInt()
-            val text = if (dark) 0xFFFFB74D.toInt() else 0xFFE65100.toInt()
+            txtModePill.text = "EDITING  •  Tap outside to lock"
+            val bg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+            val text = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
             (txtModePill.background.mutate() as? GradientDrawable)?.apply {
                 cornerRadius = 12f * resources.displayMetrics.density
                 setColor(bg)
             }
             txtModePill.setTextColor(text)
         } else {
-            txtModePill.text = "📖 READ MODE • Tap to edit"
-            val bg = if (dark) 0xFF142426.toInt() else 0xFFE1F5FE.toInt()
-            val text = if (dark) 0xFF80D8FF.toInt() else 0xFF0277BD.toInt()
+            txtModePill.text = "READ MODE  •  Tap to edit"
+            val bg = if (dark) 0xFF252525.toInt() else 0xFFE5E5E5.toInt()
+            val text = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
             (txtModePill.background.mutate() as? GradientDrawable)?.apply {
                 cornerRadius = 12f * resources.displayMetrics.density
                 setColor(bg)
@@ -250,6 +258,7 @@ class RulesEditorActivity : AppCompatActivity() {
             editRules.movementMethod = ScrollingMovementMethod.getInstance()
         }
 
+        highlightHandler.removeCallbacks(highlightRunnable)
         triggerSyntaxHighlighting()
     }
 
@@ -268,7 +277,7 @@ class RulesEditorActivity : AppCompatActivity() {
                 density = density
             )
 
-            if (isEditMode && cursorPosition >= 0 && cursorPosition <= editRules.length()) {
+            if (isEditMode && cursorPosition in 0..editRules.length() && editRules.selectionStart != cursorPosition) {
                 editRules.setSelection(cursorPosition)
             }
 
@@ -281,9 +290,20 @@ class RulesEditorActivity : AppCompatActivity() {
     }
 
     private fun updateStats() {
-        val text = editRules.text?.toString() ?: ""
-        val sectionMatches = Regex("""(?m)^\s*\[[^\]\n]+\]""").findAll(text).count()
-        val linesCount = text.lines().size
+        val editable = editRules.text ?: return
+        val textLength = editable.length
+        if (textLength == 0) {
+            txtRulesStats.text = "0 sections • 0 lines"
+            return
+        }
+
+        var linesCount = 1
+        for (i in 0 until textLength) {
+            if (editable[i] == '\n') linesCount++
+        }
+
+        val textStr = editable.toString()
+        val sectionMatches = RulesSyntaxHighlighter.SECTION_REGEX.findAll(textStr).count()
         txtRulesStats.text = "$sectionMatches sections • $linesCount lines"
     }
 
@@ -361,6 +381,11 @@ class RulesEditorActivity : AppCompatActivity() {
         applyTheme()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        highlightHandler.removeCallbacksAndMessages(null)
+    }
+
     private fun initViews() {
         rootLayout = findViewById(R.id.rootLayout)
         btnBack = findViewById(R.id.btnBack)
@@ -395,19 +420,50 @@ class RulesEditorActivity : AppCompatActivity() {
             setEditMode(!isEditMode)
         }
 
-        // Tap inside the editor to unlock Edit Mode if in Read Mode
+        // Tap inside the editor to unlock Edit Mode with strict scroll protection
+        val touchSlop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        var touchStartX = 0f
+        var touchStartY = 0f
+        var isScrollGesture = false
+
         editRules.setOnTouchListener { _, event ->
-            if (!isEditMode && event.action == MotionEvent.ACTION_UP) {
-                setEditMode(true)
-                true
+            if (!isEditMode) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        touchStartX = event.rawX
+                        touchStartY = event.rawY
+                        isScrollGesture = false
+                        // Return false so ScrollingMovementMethod can track touch for vertical scrolling
+                        false
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = Math.abs(event.rawX - touchStartX)
+                        val dy = Math.abs(event.rawY - touchStartY)
+                        if (dx > touchSlop || dy > touchSlop) {
+                            isScrollGesture = true
+                        }
+                        // Return false so ScrollingMovementMethod continues scrolling smoothly
+                        false
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (isScrollGesture) {
+                            // User was scrolling! Protect Read Mode and do NOT enter edit mode
+                            isScrollGesture = false
+                            false
+                        } else {
+                            // User performed a stationary tap without scrolling
+                            setEditMode(true)
+                            true
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        isScrollGesture = false
+                        false
+                    }
+                    else -> false
+                }
             } else {
                 false
-            }
-        }
-
-        editorCardContainer.setOnClickListener {
-            if (!isEditMode) {
-                setEditMode(true)
             }
         }
 
@@ -460,16 +516,15 @@ class RulesEditorActivity : AppCompatActivity() {
         editRules.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val currentText = s?.toString() ?: ""
-                val modified = (currentText != originalContent)
-                if (modified != isModified) {
-                    updateStatusPill(modified)
+                if (!isModified) {
+                    updateStatusPill(true)
                 }
             }
             override fun afterTextChanged(s: Editable?) {
-                if (!isHighlighting) {
-                    triggerSyntaxHighlighting()
-                }
+                if (isHighlighting) return
+                // Debounce syntax highlighting by 200ms so typing is instant and 100% fluid
+                highlightHandler.removeCallbacks(highlightRunnable)
+                highlightHandler.postDelayed(highlightRunnable, 200L)
             }
         })
 
@@ -533,6 +588,7 @@ class RulesEditorActivity : AppCompatActivity() {
 
     private fun setEditorContent(content: String) {
         originalContent = content
+        highlightHandler.removeCallbacks(highlightRunnable)
         editRules.setText(content)
         updateStatusPill(false)
         triggerSyntaxHighlighting()

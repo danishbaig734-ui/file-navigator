@@ -1,6 +1,5 @@
 package com.example
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -8,14 +7,18 @@ import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 
+class RulesColorSpan(color: Int) : ForegroundColorSpan(color), RulesSyntaxSpan
+class RulesBgSpan(color: Int) : BackgroundColorSpan(color), RulesSyntaxSpan
+class RulesStyleSpan(style: Int) : StyleSpan(style), RulesSyntaxSpan
+
 /**
- * Syntax highlighter for rules.conf files.
- * Highlights section headers as glowing badge pills, paths in dedicated path capsules,
- * keys in warm amber, and comma-separated extensions as individual rounded chip pills.
+ * High-performance syntax highlighter for rules.conf files.
+ * Aligned strictly with the app's minimalist monochrome and high-contrast aesthetic.
+ * Optimized with single-pass span recycling, fast String regex searching, and zero-allocation text scanning.
  */
 object RulesSyntaxHighlighter {
 
-    private val SECTION_REGEX = Regex("""(?m)^\s*(\[[^\]\n]+\])""")
+    val SECTION_REGEX = Regex("""(?m)^\s*(\[[^\]\n]+\])""")
     private val KEY_REGEX = Regex("""(?m)^\s*([a-zA-Z0-9_]+)\s*(=)""")
     private val PATH_REGEX = Regex("""(?:/[a-zA-Z0-9_\-\.]+)+""")
     private val EXT_LINE_REGEX = Regex("""(?m)^\s*ext\s*=\s*(.*)$""")
@@ -28,70 +31,67 @@ object RulesSyntaxHighlighter {
         density: Float = 2.0f
     ): Spannable {
         val spannable = if (text is Spannable) text else SpannableStringBuilder(text)
+        val textLength = spannable.length
+        if (textLength == 0) return spannable
 
-        // Clear existing syntax spans
-        val existingPillSpans = spannable.getSpans(0, spannable.length, RoundedPillSpan::class.java)
-        for (span in existingPillSpans) {
-            spannable.removeSpan(span)
-        }
-        val existingColorSpans = spannable.getSpans(0, spannable.length, ForegroundColorSpan::class.java)
-        for (span in existingColorSpans) {
-            spannable.removeSpan(span)
-        }
-        val existingBgSpans = spannable.getSpans(0, spannable.length, BackgroundColorSpan::class.java)
-        for (span in existingBgSpans) {
-            spannable.removeSpan(span)
-        }
-        val existingStyleSpans = spannable.getSpans(0, spannable.length, StyleSpan::class.java)
-        for (span in existingStyleSpans) {
+        // 1. Fast single-pass removal of existing syntax spans (leaves IME, selection, and system spans untouched)
+        val existingSpans = spannable.getSpans(0, textLength, RulesSyntaxSpan::class.java)
+        for (span in existingSpans) {
             spannable.removeSpan(span)
         }
 
-        // Color configurations
-        val sectionBg = if (isDark) 0x3300E5FF.toInt() else 0xFFE1F5FE.toInt()
-        val sectionBorder = if (isDark) 0xFF00E5FF.toInt() else 0xFF0288D1.toInt()
-        val sectionText = if (isDark) 0xFF80D8FF.toInt() else 0xFF01579B.toInt()
+        // Clean monochrome theme palette
+        val defaultTextColor = if (isDark) 0xFFE0E0E0.toInt() else 0xFF222222.toInt()
 
-        val pathBg = if (isDark) 0xFF14241B.toInt() else 0xFFE8F5E9.toInt()
-        val pathBorder = if (isDark) 0xFF2E7D32.toInt() else 0xFF4CAF50.toInt()
-        val pathText = if (isDark) 0xFFA5D6A7.toInt() else 0xFF1B5E20.toInt()
+        val sectionBg = if (isDark) 0xFF282828.toInt() else 0xFFE5E5E5.toInt()
+        val sectionBorder = if (isDark) 0xFF404040.toInt() else 0xFFD0D0D0.toInt()
+        val sectionText = if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
 
-        val keyTextColor = if (isDark) 0xFFFFB74D.toInt() else 0xFFE65100.toInt()
-        val equalSignColor = if (isDark) 0xFF888888.toInt() else 0xFF555555.toInt()
+        val pathBg = if (isDark) 0xFF202224.toInt() else 0xFFEEEEEE.toInt()
+        val pathBorder = if (isDark) 0xFF34383C.toInt() else 0xFFD8D8D8.toInt()
+        val pathText = if (isDark) 0xFFD0D7DE.toInt() else 0xFF1A1A1A.toInt()
 
-        val extBg = if (isDark) 0xFF2D1B38.toInt() else 0xFFF3E5F5.toInt()
-        val extBorder = if (isDark) 0xFFAB47BC.toInt() else 0xFF9C27B0.toInt()
-        val extText = if (isDark) 0xFFF48FB1.toInt() else 0xFF6A1B9A.toInt()
+        val keyTextColor = if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val equalSignColor = if (isDark) 0xFF888888.toInt() else 0xFF666666.toInt()
 
-        val defaultTextColor = if (isDark) 0xFFCCCCCC.toInt() else 0xFF333333.toInt()
+        val extBg = if (isDark) 0xFF262626.toInt() else 0xFFEAEAEA.toInt()
+        val extBorder = if (isDark) 0xFF3C3C3C.toInt() else 0xFFD4D4D4.toInt()
+        val extText = if (isDark) 0xFFE6E6E6.toInt() else 0xFF222222.toInt()
+
+        // Default base text color
         spannable.setSpan(
-            ForegroundColorSpan(defaultTextColor),
+            RulesColorSpan(defaultTextColor),
             0,
-            spannable.length,
+            textLength,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         )
 
-        // 1. Highlight Keys: scan_dirs =, dest =, ext =
-        for (match in KEY_REGEX.findAll(spannable)) {
+        // Convert to string once for fast regex matching
+        val textStr = spannable.toString()
+
+        // 2. Highlight Keys: scan_dirs =, dest =, ext =
+        for (match in KEY_REGEX.findAll(textStr)) {
             val keyGroup = match.groups[1]
             val eqGroup = match.groups[2]
             if (keyGroup != null) {
+                val start = keyGroup.range.first
+                val end = keyGroup.range.last + 1
                 spannable.setSpan(
-                    ForegroundColorSpan(keyTextColor),
-                    keyGroup.range.first,
-                    keyGroup.range.last + 1,
+                    RulesColorSpan(keyTextColor),
+                    start,
+                    end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 spannable.setSpan(
-                    StyleSpan(Typeface.BOLD),
-                    keyGroup.range.first,
-                    keyGroup.range.last + 1,
+                    RulesStyleSpan(Typeface.BOLD),
+                    start,
+                    end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
             if (eqGroup != null) {
                 spannable.setSpan(
-                    ForegroundColorSpan(equalSignColor),
+                    RulesColorSpan(equalSignColor),
                     eqGroup.range.first,
                     eqGroup.range.last + 1,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -99,8 +99,8 @@ object RulesSyntaxHighlighter {
             }
         }
 
-        // 2. Highlight Sections: [settings], [audio], etc.
-        for (match in SECTION_REGEX.findAll(spannable)) {
+        // 3. Highlight Sections: [settings], [audio], etc.
+        for (match in SECTION_REGEX.findAll(textStr)) {
             val start = match.range.first
             val end = match.range.last + 1
             if (isReadMode) {
@@ -109,31 +109,26 @@ object RulesSyntaxHighlighter {
                         bgColor = sectionBg,
                         textColor = sectionText,
                         borderColor = sectionBorder,
-                        cornerRadius = 12f * density,
-                        paddingH = 12f * density,
-                        paddingV = 4f * density,
+                        cornerRadius = 8f * density,
+                        paddingH = 10f * density,
+                        paddingV = 3f * density,
                         isBold = true,
-                        strokeWidth = 2f * density
+                        strokeWidth = 1f * density
                     ),
                     start,
                     end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             } else {
+                // In Edit Mode, use fast RulesColorSpan + bold to avoid background rect redraw during typing
                 spannable.setSpan(
-                    BackgroundColorSpan(sectionBg),
+                    RulesColorSpan(sectionText),
                     start,
                     end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 spannable.setSpan(
-                    ForegroundColorSpan(sectionText),
-                    start,
-                    end,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-                spannable.setSpan(
-                    StyleSpan(Typeface.BOLD),
+                    RulesStyleSpan(Typeface.BOLD),
                     start,
                     end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -141,8 +136,8 @@ object RulesSyntaxHighlighter {
             }
         }
 
-        // 3. Highlight Paths: /sdcard/Download, /sdcard/Music, etc.
-        for (match in PATH_REGEX.findAll(spannable)) {
+        // 4. Highlight Paths: /sdcard/Download, /sdcard/Music, etc.
+        for (match in PATH_REGEX.findAll(textStr)) {
             val start = match.range.first
             val end = match.range.last + 1
             if (isReadMode) {
@@ -151,11 +146,11 @@ object RulesSyntaxHighlighter {
                         bgColor = pathBg,
                         textColor = pathText,
                         borderColor = pathBorder,
-                        cornerRadius = 8f * density,
-                        paddingH = 10f * density,
-                        paddingV = 3f * density,
-                        isBold = true,
-                        strokeWidth = 1.5f * density
+                        cornerRadius = 6f * density,
+                        paddingH = 8f * density,
+                        paddingV = 2.5f * density,
+                        isBold = false,
+                        strokeWidth = 1f * density
                     ),
                     start,
                     end,
@@ -163,13 +158,7 @@ object RulesSyntaxHighlighter {
                 )
             } else {
                 spannable.setSpan(
-                    BackgroundColorSpan(pathBg),
-                    start,
-                    end,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-                spannable.setSpan(
-                    ForegroundColorSpan(pathText),
+                    RulesColorSpan(pathText),
                     start,
                     end,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -177,8 +166,8 @@ object RulesSyntaxHighlighter {
             }
         }
 
-        // 4. Highlight Individual Extension Chips: pdf, doc, docx, etc. after ext =
-        for (lineMatch in EXT_LINE_REGEX.findAll(spannable)) {
+        // 5. Highlight Individual Extension Chips: pdf, doc, docx, etc. after ext =
+        for (lineMatch in EXT_LINE_REGEX.findAll(textStr)) {
             val extValuesGroup = lineMatch.groups[1] ?: continue
             val extSubstr = extValuesGroup.value
             val baseOffset = extValuesGroup.range.first
@@ -192,11 +181,11 @@ object RulesSyntaxHighlighter {
                             bgColor = extBg,
                             textColor = extText,
                             borderColor = extBorder,
-                            cornerRadius = 7f * density,
-                            paddingH = 8f * density,
-                            paddingV = 2.5f * density,
+                            cornerRadius = 5f * density,
+                            paddingH = 6f * density,
+                            paddingV = 2f * density,
                             isBold = true,
-                            strokeWidth = 1.5f * density
+                            strokeWidth = 1f * density
                         ),
                         tokenStart,
                         tokenEnd,
@@ -204,19 +193,13 @@ object RulesSyntaxHighlighter {
                     )
                 } else {
                     spannable.setSpan(
-                        BackgroundColorSpan(extBg),
+                        RulesColorSpan(extText),
                         tokenStart,
                         tokenEnd,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
                     spannable.setSpan(
-                        ForegroundColorSpan(extText),
-                        tokenStart,
-                        tokenEnd,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                    spannable.setSpan(
-                        StyleSpan(Typeface.BOLD),
+                        RulesStyleSpan(Typeface.BOLD),
                         tokenStart,
                         tokenEnd,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE

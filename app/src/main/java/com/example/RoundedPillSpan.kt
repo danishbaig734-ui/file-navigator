@@ -6,19 +6,25 @@ import android.graphics.RectF
 import android.text.style.ReplacementSpan
 
 /**
- * Custom ReplacementSpan that renders text inside a modern, rounded pill badge
- * with custom background color, optional border/glow stroke, text color, and padding.
+ * Marker interface to identify all syntax highlighting spans managed by RulesSyntaxHighlighter.
+ * Allows fast, single-pass batch removal without querying multiple span types or disturbing IME/system spans.
+ */
+interface RulesSyntaxSpan
+
+/**
+ * Custom ReplacementSpan that renders text inside a refined, understated pill badge
+ * matching the minimalist monochrome design of the app.
  */
 class RoundedPillSpan(
     private val bgColor: Int,
     private val textColor: Int,
     private val borderColor: Int = 0,
-    private val cornerRadius: Float = 14f,
-    private val paddingH: Float = 16f,
-    private val paddingV: Float = 6f,
+    private val cornerRadius: Float = 10f,
+    private val paddingH: Float = 12f,
+    private val paddingV: Float = 4f,
     private val isBold: Boolean = true,
-    private val strokeWidth: Float = 2.5f
-) : ReplacementSpan() {
+    private val strokeWidth: Float = 1.2f
+) : ReplacementSpan(), RulesSyntaxSpan {
 
     override fun getSize(
         paint: Paint,
@@ -62,16 +68,16 @@ class RoundedPillSpan(
         paint.isFakeBoldText = isBold
         val textWidth = paint.measureText(text, start, end)
 
-        val rectTop = top.toFloat() + 2f
-        val rectBottom = bottom.toFloat() - 2f
-        val rect = RectF(x + 2f, rectTop, x + textWidth + paddingH * 2 - 2f, rectBottom)
+        val rectTop = top.toFloat() + 3f
+        val rectBottom = bottom.toFloat() - 3f
+        val rect = RectF(x + 1f, rectTop, x + textWidth + paddingH * 2 - 1f, rectBottom)
 
         // 1. Draw Pill Background
         paint.color = bgColor
         paint.style = Paint.Style.FILL
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
 
-        // 2. Draw Pill Border / Glow
+        // 2. Draw Subtle Border if configured
         if (borderColor != 0) {
             paint.color = borderColor
             paint.style = Paint.Style.STROKE

@@ -271,7 +271,7 @@
                 android:paddingHorizontal="4dp"
                 android:paddingVertical="4dp"
                 android:scrollbars="vertical"
-                android:textColor="#80D8FF"
+                android:textColor="#E0E0E0"
                 android:textColorHint="#616161"
                 android:textSize="13sp" />
         </LinearLayout>
