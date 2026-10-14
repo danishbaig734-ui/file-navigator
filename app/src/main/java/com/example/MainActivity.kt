@@ -107,12 +107,9 @@ class MainActivity : AppCompatActivity() {
 
         val secBtnTextColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
         val secBtnBgColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
-        listOf(
-            findViewById<Button>(R.id.btnRefreshLog),
-            findViewById<Button>(R.id.btnClearLog)
-        ).forEach { btn ->
+        findViewById<Button>(R.id.btnClearLog)?.let { btn ->
             (btn.background.mutate() as? GradientDrawable)?.apply {
-                cornerRadius = 20f * resources.displayMetrics.density
+                cornerRadius = 18f * resources.displayMetrics.density
                 setColor(secBtnBgColor)
             }
             btn.setTextColor(secBtnTextColor)
@@ -141,7 +138,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
     private var logAdapter: LogEntryAdapter? = null
-    private lateinit var buttonRefreshLog: Button
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
 
@@ -240,7 +236,6 @@ class MainActivity : AppCompatActivity() {
         buttonViewLogs = findViewById(R.id.btnViewLogs)
         rvLog = findViewById(R.id.rvLog)
         rvLog.layoutManager = LinearLayoutManager(this)
-        buttonRefreshLog = findViewById(R.id.btnRefreshLog)
         buttonClearLog = findViewById(R.id.btnClearLog)
         mainScrollView = findViewById(R.id.scrollContent)
     }
@@ -253,6 +248,7 @@ class MainActivity : AppCompatActivity() {
         attachPressScale(buttonRun, grow = 1.08f)
         attachPressScale(buttonEditRules, grow = 1.04f)
         attachPressScale(buttonViewLogs, grow = 1.04f)
+        attachPressScale(buttonClearLog, grow = 1.05f)
 
         buttonRun.setOnClickListener {
             if (!hasRunCommandPermission()) {
@@ -274,10 +270,6 @@ class MainActivity : AppCompatActivity() {
         buttonViewLogs.setOnClickListener {
             val intent = Intent(this, LogViewerActivity::class.java)
             startActivity(intent)
-        }
-
-        buttonRefreshLog.setOnClickListener {
-            refreshLogDisplay()
         }
 
         buttonClearLog.setOnClickListener {
@@ -502,7 +494,9 @@ class MainActivity : AppCompatActivity() {
         val entries = LogParser.parseContent(content)
         val dark = isDarkMode()
         if (logAdapter == null) {
-            logAdapter = LogEntryAdapter(entries, dark)
+            logAdapter = LogEntryAdapter(entries, dark) { entry ->
+                copyLogToClipboard(entry)
+            }
             rvLog.adapter = logAdapter
         } else {
             logAdapter?.update(entries, dark)
@@ -512,6 +506,18 @@ class MainActivity : AppCompatActivity() {
                 rvLog.scrollToPosition(entries.size - 1)
             }
         }
+    }
+
+    private fun copyLogToClipboard(entry: LogEntry) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val textToCopy = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
+            "${entry.timestamp} — ${entry.message}"
+        } else {
+            entry.message
+        }
+        val clip = android.content.ClipData.newPlainText("Log Entry", textToCopy)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
     companion object {

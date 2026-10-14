@@ -129,68 +129,55 @@
                 app:layout_constraintStart_toEndOf="@id/btnEditRules"
                 app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
 
-            <TextView
-                android:id="@+id/lblEventLog"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/rowLogHeader"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="28dp"
-                android:text="Event Log (last 100 entries):"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/btnViewLogs" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvLog"
-                android:layout_width="0dp"
-                android:layout_height="220dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/log_field_bg"
-                android:clipToPadding="false"
-                android:overScrollMode="always"
-                android:padding="4dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/lblEventLog" />
-
-            <LinearLayout
-                android:id="@+id/rowLogButtons"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="20dp"
-                android:gravity="end"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/rvLog"
-                app:layout_constraintVertical_bias="0">
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/btnViewLogs">
 
-                <Button
-                    android:id="@+id/btnRefreshLog"
-                    style="?android:attr/buttonStyle"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/lblEventLog"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/rounded_button_bg"
-                    android:foreground="?android:attr/selectableItemBackground"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="16dp"
-                    android:text="Refresh"
-                    android:textSize="14sp" />
+                    android:layout_weight="1"
+                    android:text="Event Log (last 100 entries):"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <Button
                     android:id="@+id/btnClearLog"
                     style="?android:attr/buttonStyle"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="36dp"
                     android:background="@drawable/rounded_button_bg"
                     android:foreground="?android:attr/selectableItemBackground"
-                    android:minHeight="40dp"
+                    android:minHeight="36dp"
+                    android:minWidth="0dp"
                     android:paddingHorizontal="16dp"
+                    android:paddingVertical="0dp"
                     android:text="Clear"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvLog"
+                android:layout_width="0dp"
+                android:layout_height="380dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/log_field_bg"
+                android:clipToPadding="false"
+                android:overScrollMode="always"
+                android:padding="6dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/rowLogHeader" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>

@@ -2,9 +2,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
     android:gravity="top"
     android:orientation="horizontal"
-    android:paddingHorizontal="6dp"
+    android:paddingHorizontal="8dp"
     android:paddingVertical="8dp">
 
     <TextView

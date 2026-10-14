@@ -1,14 +1,20 @@
 package com.example
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 
 class LogEntryAdapter(
     private var items: List<LogEntry>,
-    private var isDark: Boolean
+    private var isDark: Boolean,
+    private val onItemLongClick: ((LogEntry) -> Unit)? = null
 ) : RecyclerView.Adapter<LogEntryAdapter.VH>() {
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -53,6 +59,23 @@ class LogEntryAdapter(
             LogType.NEUTRAL -> if (isDark) 0xFFA0A0A0.toInt() else 0xFF666666.toInt()
         }
         holder.tvMessage.setTextColor(messageColor)
+
+        holder.itemView.setOnLongClickListener { view ->
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            if (onItemLongClick != null) {
+                onItemLongClick.invoke(entry)
+            } else {
+                val clipboard = view.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val textToCopy = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
+                    "${entry.timestamp} — ${entry.message}"
+                } else {
+                    entry.message
+                }
+                clipboard.setPrimaryClip(ClipData.newPlainText("Log Entry", textToCopy))
+                Toast.makeText(view.context, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
     }
 
     fun update(newItems: List<LogEntry>, dark: Boolean) {
