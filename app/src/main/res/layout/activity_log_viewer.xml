@@ -122,50 +122,70 @@
                 app:layout_constraintTop_toTopOf="@id/txtHeaderTitle" />
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- Segmented Tab Bar -->
-        <LinearLayout
-            android:id="@+id/rowTabs"
+        <!-- Segmented Tab Bar with Sliding Pill -->
+        <FrameLayout
+            android:id="@+id/tabContainer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_marginTop="6dp"
             android:layout_marginBottom="12dp"
-            android:orientation="horizontal">
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
 
-            <Button
-                android:id="@+id/tab_actions"
-                style="?android:attr/buttonStyle"
+            <!-- Sliding Selection Pill -->
+            <View
+                android:id="@+id/pillIndicator"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:background="@drawable/rounded_button_bg"
-                android:foreground="?android:attr/selectableItemBackground"
-                android:text="Actions"
-                android:textSize="13sp" />
+                android:layout_height="match_parent" />
 
-            <Button
-                android:id="@+id/tab_unmatched"
-                style="?android:attr/buttonStyle"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/rounded_button_bg"
-                android:foreground="?android:attr/selectableItemBackground"
-                android:text="Unmatched"
-                android:textSize="13sp" />
+            <!-- Three Tab Items -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/tab_errors"
-                style="?android:attr/buttonStyle"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/rounded_button_bg"
-                android:foreground="?android:attr/selectableItemBackground"
-                android:text="Errors"
-                android:textSize="13sp" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tabActions"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/anta"
+                    android:gravity="center"
+                    android:text="ACTIONS"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabUnmatched"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/anta"
+                    android:gravity="center"
+                    android:text="UNMATCHED"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tabErrors"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/anta"
+                    android:gravity="center"
+                    android:text="ERRORS"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
 
         <!-- Curved Logs Container Card -->
         <FrameLayout
@@ -174,6 +194,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:background="@drawable/editor_card_bg"
+            android:longClickable="true"
             android:padding="6dp">
 
             <androidx.recyclerview.widget.RecyclerView
@@ -181,6 +202,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
+                android:longClickable="true"
                 android:overScrollMode="always"
                 android:padding="4dp" />
 
@@ -191,6 +213,7 @@
                 android:layout_gravity="center"
                 android:alpha="0.5"
                 android:fontFamily="@font/anta"
+                android:longClickable="true"
                 android:text="(no log entries recorded yet)"
                 android:textSize="13sp"
                 android:visibility="gone" />

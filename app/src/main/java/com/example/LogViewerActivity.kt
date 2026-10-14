@@ -3,6 +3,7 @@ package com.example
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -97,8 +98,8 @@ class DocumentFile private constructor(
 }
 
 /**
- * LogViewerActivity redesigned with the minimalist monochrome aesthetic,
- * spring touch physics, pill tabs, structured log entry list, and long-press clipboard copy.
+ * LogViewerActivity redesigned with a modern single segmented control bar and sliding pill indicator,
+ * fixed tab states, dynamic theme shifting, and a hidden long-press gesture to view technical.log.
  */
 class LogViewerActivity : AppCompatActivity() {
 
@@ -118,15 +119,21 @@ class LogViewerActivity : AppCompatActivity() {
     private lateinit var txtHeaderTitle: TextView
     private lateinit var txtSubtitle: TextView
     private lateinit var btnRefreshLogs: ImageButton
-    private lateinit var tabActions: Button
-    private lateinit var tabUnmatched: Button
-    private lateinit var tabErrors: Button
+
+    private lateinit var tabContainer: FrameLayout
+    private lateinit var pillIndicator: View
+    private lateinit var tabActions: TextView
+    private lateinit var tabUnmatched: TextView
+    private lateinit var tabErrors: TextView
+
     private lateinit var logCardContainer: FrameLayout
     private lateinit var rvLogViewer: RecyclerView
     private lateinit var txtEmptyLogs: TextView
 
     private var logAdapter: LogEntryAdapter? = null
+    private var currentTabIndex: Int = 0
     private var currentTab: LogTab = LogTab.ACTIONS
+    private var isSecretLongPressDetected = false
 
     private fun isDarkMode(): Boolean =
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DARK_MODE, true)
@@ -173,15 +180,28 @@ class LogViewerActivity : AppCompatActivity() {
         }
         btnClearLog.setTextColor(secBtnTextColor)
 
-        // 6. Log card container
+        // 6. Segmented Tab Bar container & Pill
+        val containerBg = GradientDrawable().apply {
+            cornerRadius = 24f * resources.displayMetrics.density
+            setColor(if (dark) 0xFF222222.toInt() else 0xFFE5E5E5.toInt())
+        }
+        tabContainer.background = containerBg
+
+        val pillBg = GradientDrawable().apply {
+            cornerRadius = 20f * resources.displayMetrics.density
+            setColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+        }
+        pillIndicator.background = pillBg
+
+        updateTabColors()
+
+        // 7. Log card container
         val cardBg = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
         (logCardContainer.background.mutate() as? GradientDrawable)?.apply {
             cornerRadius = 24f * resources.displayMetrics.density
             setColor(cardBg)
         }
 
-        // 7. Update Tabs and Adapter
-        updateTabButtons()
         loadCurrentLog()
     }
 
@@ -192,7 +212,21 @@ class LogViewerActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         applyTheme()
-        selectTab(LogTab.ACTIONS, animate = false)
+
+        tabContainer.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            val innerWidth = (right - left) - tabContainer.paddingLeft - tabContainer.paddingRight
+            if (innerWidth > 0) {
+                val tabWidth = innerWidth / 3
+                if (pillIndicator.layoutParams.width != tabWidth) {
+                    val lp = pillIndicator.layoutParams
+                    lp.width = tabWidth
+                    pillIndicator.layoutParams = lp
+                }
+                pillIndicator.translationX = (innerWidth / 3f) * currentTabIndex
+            }
+        }
+
+        selectTab(0, animate = false)
     }
 
     override fun onResume() {
@@ -208,9 +242,13 @@ class LogViewerActivity : AppCompatActivity() {
         txtHeaderTitle = findViewById(R.id.txtHeaderTitle)
         txtSubtitle = findViewById(R.id.txtSubtitle)
         btnRefreshLogs = findViewById(R.id.btnRefreshLogs)
-        tabActions = findViewById(R.id.tab_actions)
-        tabUnmatched = findViewById(R.id.tab_unmatched)
-        tabErrors = findViewById(R.id.tab_errors)
+
+        tabContainer = findViewById(R.id.tabContainer)
+        pillIndicator = findViewById(R.id.pillIndicator)
+        tabActions = findViewById(R.id.tabActions)
+        tabUnmatched = findViewById(R.id.tabUnmatched)
+        tabErrors = findViewById(R.id.tabErrors)
+
         logCardContainer = findViewById(R.id.logCardContainer)
         rvLogViewer = findViewById(R.id.rvLogViewer)
         txtEmptyLogs = findViewById(R.id.txtEmptyLogs)
@@ -226,22 +264,115 @@ class LogViewerActivity : AppCompatActivity() {
         attachSpringPress(btnBack, pressScale = 0.88f, overshoot = 4f)
         attachSpringPress(btnRefreshLogs, pressScale = 0.90f, overshoot = 4f)
         attachSpringPress(btnClearLog, pressScale = 0.94f, overshoot = 3.5f)
-        attachSpringPress(tabActions, pressScale = 0.94f, overshoot = 3.5f)
-        attachSpringPress(tabUnmatched, pressScale = 0.94f, overshoot = 3.5f)
-        attachSpringPress(tabErrors, pressScale = 0.94f, overshoot = 3.5f)
 
         btnRefreshLogs.setOnClickListener {
             loadCurrentLog()
             Toast.makeText(this, "Logs refreshed", Toast.LENGTH_SHORT).show()
         }
 
-        tabActions.setOnClickListener { selectTab(LogTab.ACTIONS) }
-        tabUnmatched.setOnClickListener { selectTab(LogTab.UNMATCHED) }
-        tabErrors.setOnClickListener { selectTab(LogTab.ERRORS) }
+        tabActions.setOnClickListener { selectTab(0) }
+        tabUnmatched.setOnClickListener { selectTab(1) }
+        tabErrors.setOnClickListener { selectTab(2) }
 
         btnClearLog.setOnClickListener {
             showCustomClearDialog()
         }
+
+        // Hidden secret gesture on log area to view technical.log
+        setupSecretGesture(rvLogViewer)
+        setupSecretGesture(txtEmptyLogs)
+        setupSecretGesture(logCardContainer)
+    }
+
+    private fun setupSecretGesture(view: View) {
+        view.isLongClickable = true
+        view.setOnLongClickListener {
+            isSecretLongPressDetected = true
+            true // Consumes event without ripple, highlight, or toast
+        }
+        view.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    isSecretLongPressDetected = false
+                    false
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isSecretLongPressDetected) {
+                        isSecretLongPressDetected = false
+                        openTechnicalLog()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    isSecretLongPressDetected = false
+                    false
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun openTechnicalLog() {
+        val intent = Intent(this, TechnicalLogActivity::class.java)
+        startActivity(intent)
+    }
+
+    fun selectTab(index: Int, animate: Boolean = true) {
+        currentTabIndex = index.coerceIn(0, 2)
+        currentTab = when (currentTabIndex) {
+            0 -> LogTab.ACTIONS
+            1 -> LogTab.UNMATCHED
+            2 -> LogTab.ERRORS
+            else -> LogTab.ACTIONS
+        }
+        txtPill.text = currentTab.fileName
+
+        updateTabColors()
+
+        fun updatePill() {
+            val innerWidth = tabContainer.width - tabContainer.paddingLeft - tabContainer.paddingRight
+            if (innerWidth > 0) {
+                val tabWidth = innerWidth / 3
+                if (pillIndicator.layoutParams.width != tabWidth) {
+                    val lp = pillIndicator.layoutParams
+                    lp.width = tabWidth
+                    pillIndicator.layoutParams = lp
+                }
+                val targetX = (innerWidth / 3f) * currentTabIndex
+                if (animate) {
+                    pillIndicator.animate()
+                        .translationX(targetX)
+                        .setDuration(220)
+                        .setInterpolator(DecelerateInterpolator())
+                        .start()
+                } else {
+                    pillIndicator.animate().cancel()
+                    pillIndicator.translationX = targetX
+                }
+            }
+        }
+
+        if (tabContainer.width > 0) {
+            updatePill()
+        } else {
+            tabContainer.post {
+                updatePill()
+            }
+        }
+
+        loadCurrentLog()
+    }
+
+    private fun updateTabColors() {
+        val dark = isDarkMode()
+        val activeTextColor = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+        val dimmedTextColor = if (dark) 0xFF999999.toInt() else 0xFF666666.toInt()
+
+        tabActions.setTextColor(if (currentTabIndex == 0) activeTextColor else dimmedTextColor)
+        tabUnmatched.setTextColor(if (currentTabIndex == 1) activeTextColor else dimmedTextColor)
+        tabErrors.setTextColor(if (currentTabIndex == 2) activeTextColor else dimmedTextColor)
     }
 
     private fun attachSpringPress(view: View, pressScale: Float = 0.94f, overshoot: Float = 3.5f) {
@@ -265,62 +396,6 @@ class LogViewerActivity : AppCompatActivity() {
                 }
             }
             false
-        }
-    }
-
-    private fun selectTab(tab: LogTab, animate: Boolean = true) {
-        currentTab = tab
-        txtPill.text = tab.fileName
-
-        if (animate) {
-            val selectedBtn = when (tab) {
-                LogTab.ACTIONS -> tabActions
-                LogTab.UNMATCHED -> tabUnmatched
-                LogTab.ERRORS -> tabErrors
-            }
-            selectedBtn.scaleX = 0.90f
-            selectedBtn.scaleY = 0.90f
-            selectedBtn.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(300)
-                .setInterpolator(android.view.animation.OvershootInterpolator(4f))
-                .start()
-        }
-
-        updateTabButtons()
-        loadCurrentLog()
-    }
-
-    private fun updateTabButtons() {
-        val dark = isDarkMode()
-        val tabs = listOf(
-            tabActions to (currentTab == LogTab.ACTIONS),
-            tabUnmatched to (currentTab == LogTab.UNMATCHED),
-            tabErrors to (currentTab == LogTab.ERRORS)
-        )
-
-        for ((btn, isSelected) in tabs) {
-            if (isSelected) {
-                if (dark) {
-                    btn.setBackgroundResource(R.drawable.rounded_button_ripple_white)
-                    btn.setTextColor(0xFF000000.toInt())
-                } else {
-                    btn.setBackgroundResource(R.drawable.rounded_button_ripple_black)
-                    btn.setTextColor(0xFFFFFFFF.toInt())
-                }
-                btn.paint.isFakeBoldText = true
-            } else {
-                val secBg = if (dark) 0xFF262626.toInt() else 0xFFE5E5E5.toInt()
-                val secText = if (dark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
-                (btn.background.mutate() as? GradientDrawable)?.apply {
-                    cornerRadius = 22f * resources.displayMetrics.density
-                    setColor(secBg)
-                }
-                btn.setTextColor(secText)
-                btn.paint.isFakeBoldText = false
-            }
-            btn.invalidate()
         }
     }
 

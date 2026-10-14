@@ -42,6 +42,11 @@
             android:label="Logs" />
 
         <activity
+            android:name=".TechnicalLogActivity"
+            android:exported="false"
+            android:label="Technical Log" />
+
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="Settings" />

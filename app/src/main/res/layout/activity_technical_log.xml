@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Top App Bar / Header Row -->
+    <LinearLayout
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/circular_button_ripple"
+            android:contentDescription="Back"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_back_arrow" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:gravity="start|center_vertical">
+
+            <TextView
+                android:id="@+id/txtPill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/pill_bg"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:text="technical.log"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnClearLog"
+            style="?android:attr/buttonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/rounded_button_bg"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:minHeight="36dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="0dp"
+            android:text="Clear"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Main Content Area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="20dp">
+
+        <!-- Hero Header section matching MainActivity -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/heroHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:id="@+id/txtHeaderTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:fontFamily="@font/orbitron_bold"
+                android:lineSpacingMultiplier="0.95"
+                android:text="Technical&#10;Log"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toStartOf="@id/btnRefreshLogs"
+                app:layout_constraintHorizontal_bias="0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/txtSubtitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:layout_marginEnd="16dp"
+                android:alpha="0.6"
+                android:text="Internal execution &amp; background logs"
+                android:textSize="13sp"
+                app:layout_constraintEnd_toStartOf="@id/btnRefreshLogs"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/txtHeaderTitle" />
+
+            <ImageButton
+                android:id="@+id/btnRefreshLogs"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@drawable/circular_action_ripple"
+                android:contentDescription="Refresh Logs"
+                android:padding="16dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_refresh"
+                app:layout_constraintBottom_toBottomOf="@id/txtSubtitle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@id/txtHeaderTitle" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Curved Logs Container Card -->
+        <FrameLayout
+            android:id="@+id/logCardContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/editor_card_bg"
+            android:padding="6dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvLogViewer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:overScrollMode="always"
+                android:padding="4dp" />
+
+            <TextView
+                android:id="@+id/txtEmptyLogs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:alpha="0.5"
+                android:fontFamily="@font/anta"
+                android:text="(no technical log entries recorded yet)"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
