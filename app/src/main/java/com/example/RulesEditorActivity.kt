@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -14,11 +15,15 @@ import android.os.IBinder
 import android.provider.DocumentsContract
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.method.ArrowKeyMovementMethod
+import android.text.method.KeyListener
+import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
@@ -32,17 +37,22 @@ import androidx.appcompat.app.AppCompatActivity
 /**
  * Rules Editor Activity styled with the futuristic, high-contrast monochrome aesthetic
  * of the main screen. Supports dynamic light/dark theme shifting, curved editor card,
- * rounded buttons, quick insert chips, and tactile press scaling animations.
+ * rounded buttons, quick insert chips, syntax pill highlighting, and seamless
+ * Read-Only vs. Edit Mode interaction with tap-outside locking.
  */
 class RulesEditorActivity : AppCompatActivity() {
 
     private val PREFS = "app_prefs"
     private val KEY_DARK_MODE = "dark_mode"
 
+    private lateinit var rootLayout: View
     private lateinit var btnBack: ImageButton
     private lateinit var txtPill: TextView
     private lateinit var txtStatusPill: TextView
     private lateinit var btnRunScript: ImageButton
+    private lateinit var editorCardContainer: View
+    private lateinit var txtModePill: TextView
+    private lateinit var txtRulesStats: TextView
     private lateinit var editRules: EditText
     private lateinit var buttonPickPath: Button
     private lateinit var buttonReset: Button
@@ -50,6 +60,9 @@ class RulesEditorActivity : AppCompatActivity() {
 
     private var originalContent: String = ""
     private var isModified: Boolean = false
+    private var isEditMode: Boolean = false
+    private var defaultKeyListener: KeyListener? = null
+    private var isHighlighting: Boolean = false
 
     private fun isDarkMode(): Boolean =
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DARK_MODE, true)
@@ -58,9 +71,8 @@ class RulesEditorActivity : AppCompatActivity() {
         val dark = isDarkMode()
 
         // 1. Root & Header backgrounds
-        val root = findViewById<View>(R.id.rootLayout)
         val bgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFF5F5F5.toInt()
-        root.setBackgroundColor(bgColor)
+        rootLayout.setBackgroundColor(bgColor)
 
         val header = findViewById<View>(R.id.headerRow)
         header.setBackgroundColor(if (dark) 0xFF222222.toInt() else 0xFFFFFFFF.toInt())
@@ -72,7 +84,7 @@ class RulesEditorActivity : AppCompatActivity() {
         val subtitle = findViewById<TextView>(R.id.txtSubtitle)
         subtitle.setTextColor(if (dark) 0xFFCCCCCC.toInt() else 0xFF555555.toInt())
 
-        // 3. Pills
+        // 3. Header Pills
         val pillBgColor = if (dark) 0xFF1A1A1A.toInt() else 0xFFE5E5E5.toInt()
         (txtPill.background.mutate() as? GradientDrawable)?.setColor(pillBgColor)
         txtPill.setTextColor(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
@@ -96,9 +108,8 @@ class RulesEditorActivity : AppCompatActivity() {
         btnRunScript.setColorFilter(runBtnIcon)
 
         // 6. Curved editor container
-        val editorCard = findViewById<View>(R.id.editorCardContainer)
         val fieldBgColor = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
-        (editorCard.background.mutate() as? GradientDrawable)?.apply {
+        (editorCardContainer.background.mutate() as? GradientDrawable)?.apply {
             cornerRadius = 24f * resources.displayMetrics.density
             setColor(fieldBgColor)
         }
@@ -107,10 +118,8 @@ class RulesEditorActivity : AppCompatActivity() {
         val dividerColor = if (dark) 0x22FFFFFF else 0x15000000
         findViewById<View>(R.id.editorDivider).setBackgroundColor(dividerColor)
 
-        // 8. Editor text and hint
-        val editTextColor = if (dark) 0xFF80D8FF.toInt() else 0xFF005B94.toInt()
+        // 8. Editor base text and hint
         val hintColor = if (dark) 0xFF616161.toInt() else 0xFF9E9E9E.toInt()
-        editRules.setTextColor(editTextColor)
         editRules.setHintTextColor(hintColor)
 
         // 9. Quick snippet chips
@@ -151,6 +160,10 @@ class RulesEditorActivity : AppCompatActivity() {
             buttonSave.setBackgroundResource(R.drawable.rounded_button_ripple_black)
             buttonSave.setTextColor(0xFFFFFFFF.toInt())
         }
+
+        // Update mode styling and syntax highlighting
+        updateModePillUI()
+        triggerSyntaxHighlighting()
     }
 
     private fun updateStatusPill(modified: Boolean, dark: Boolean = isDarkMode()) {
@@ -164,6 +177,129 @@ class RulesEditorActivity : AppCompatActivity() {
             txtStatusPill.text = "Saved ✓"
             txtStatusPill.setTextColor(if (dark) 0xFF81C784.toInt() else 0xFF2E7D32.toInt())
         }
+    }
+
+    private fun updateModePillUI() {
+        val dark = isDarkMode()
+        if (isEditMode) {
+            txtModePill.text = "✏️ EDITING • Tap outside to lock"
+            val bg = if (dark) 0xFF2D1F10.toInt() else 0xFFFFF3E0.toInt()
+            val text = if (dark) 0xFFFFB74D.toInt() else 0xFFE65100.toInt()
+            (txtModePill.background.mutate() as? GradientDrawable)?.apply {
+                cornerRadius = 12f * resources.displayMetrics.density
+                setColor(bg)
+            }
+            txtModePill.setTextColor(text)
+        } else {
+            txtModePill.text = "📖 READ MODE • Tap to edit"
+            val bg = if (dark) 0xFF142426.toInt() else 0xFFE1F5FE.toInt()
+            val text = if (dark) 0xFF80D8FF.toInt() else 0xFF0277BD.toInt()
+            (txtModePill.background.mutate() as? GradientDrawable)?.apply {
+                cornerRadius = 12f * resources.displayMetrics.density
+                setColor(bg)
+            }
+            txtModePill.setTextColor(text)
+        }
+    }
+
+    private fun setEditMode(enabled: Boolean, animateSpring: Boolean = true) {
+        if (isEditMode == enabled) return
+        isEditMode = enabled
+
+        updateModePillUI()
+
+        if (animateSpring) {
+            // Spring bounce on the mode pill
+            txtModePill.scaleX = 0.86f
+            txtModePill.scaleY = 0.86f
+            txtModePill.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(350)
+                .setInterpolator(android.view.animation.OvershootInterpolator(4f))
+                .start()
+
+            // Subtle spring bounce on editor card container
+            editorCardContainer.scaleX = 0.98f
+            editorCardContainer.scaleY = 0.98f
+            editorCardContainer.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(320)
+                .setInterpolator(android.view.animation.OvershootInterpolator(3f))
+                .start()
+        }
+
+        if (isEditMode) {
+            editRules.keyListener = defaultKeyListener
+            editRules.movementMethod = ArrowKeyMovementMethod.getInstance()
+            editRules.isFocusable = true
+            editRules.isFocusableInTouchMode = true
+            editRules.isCursorVisible = true
+            editRules.requestFocus()
+
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(editRules, InputMethodManager.SHOW_IMPLICIT)
+        } else {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(editRules.windowToken, 0)
+
+            editRules.clearFocus()
+            editRules.isCursorVisible = false
+            editRules.keyListener = null
+            editRules.movementMethod = ScrollingMovementMethod.getInstance()
+        }
+
+        triggerSyntaxHighlighting()
+    }
+
+    private fun triggerSyntaxHighlighting() {
+        if (isHighlighting) return
+        isHighlighting = true
+        try {
+            val dark = isDarkMode()
+            val density = resources.displayMetrics.density
+            val cursorPosition = editRules.selectionStart
+
+            RulesSyntaxHighlighter.highlight(
+                text = editRules.text,
+                isDark = dark,
+                isReadMode = !isEditMode,
+                density = density
+            )
+
+            if (isEditMode && cursorPosition >= 0 && cursorPosition <= editRules.length()) {
+                editRules.setSelection(cursorPosition)
+            }
+
+            updateStats()
+        } catch (e: Exception) {
+            Log.e(TAG, "highlighting failed: ${e.message}", e)
+        } finally {
+            isHighlighting = false
+        }
+    }
+
+    private fun updateStats() {
+        val text = editRules.text?.toString() ?: ""
+        val sectionMatches = Regex("""(?m)^\s*\[[^\]\n]+\]""").findAll(text).count()
+        val linesCount = text.lines().size
+        txtRulesStats.text = "$sectionMatches sections • $linesCount lines"
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.action == MotionEvent.ACTION_DOWN && isEditMode) {
+            val rect = Rect()
+            editorCardContainer.getGlobalVisibleRect(rect)
+            val x = ev.rawX.toInt()
+            val y = ev.rawY.toInt()
+
+            // If user taps outside the editorCardContainer, lock into Read Mode immediately
+            if (!rect.contains(x, y)) {
+                setEditMode(false)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     private val folderPermissionLauncher = registerForActivityResult(
@@ -213,6 +349,10 @@ class RulesEditorActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         applyTheme()
+
+        // Start in Read Mode by default so the keyboard doesn't pop up automatically
+        setEditMode(false)
+
         initRulesFile()
     }
 
@@ -222,14 +362,20 @@ class RulesEditorActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        rootLayout = findViewById(R.id.rootLayout)
         btnBack = findViewById(R.id.btnBack)
         txtPill = findViewById(R.id.txtPill)
         txtStatusPill = findViewById(R.id.txtStatusPill)
         btnRunScript = findViewById(R.id.btnRunScript)
+        editorCardContainer = findViewById(R.id.editorCardContainer)
+        txtModePill = findViewById(R.id.txtModePill)
+        txtRulesStats = findViewById(R.id.txtRulesStats)
         editRules = findViewById(R.id.edit_rules)
         buttonPickPath = findViewById(R.id.button_pick_path)
         buttonReset = findViewById(R.id.button_reset)
         buttonSave = findViewById(R.id.button_save)
+
+        defaultKeyListener = editRules.keyListener
     }
 
     private fun setupListeners() {
@@ -237,11 +383,33 @@ class RulesEditorActivity : AppCompatActivity() {
             finish()
         }
 
-        attachPressScale(btnBack, grow = 1.08f)
-        attachPressScale(btnRunScript, grow = 1.08f)
-        attachPressScale(buttonPickPath, grow = 1.04f)
-        attachPressScale(buttonReset, grow = 1.04f)
-        attachPressScale(buttonSave, grow = 1.04f)
+        attachSpringPress(btnBack, pressScale = 0.88f, overshoot = 4f)
+        attachSpringPress(btnRunScript, pressScale = 0.90f, overshoot = 4f)
+        attachSpringPress(buttonPickPath, pressScale = 0.95f, overshoot = 3.5f)
+        attachSpringPress(buttonReset, pressScale = 0.95f, overshoot = 3.5f)
+        attachSpringPress(buttonSave, pressScale = 0.95f, overshoot = 3.5f)
+        attachSpringPress(txtModePill, pressScale = 0.92f, overshoot = 4f)
+
+        // Toggle Read/Edit mode via the mode pill
+        txtModePill.setOnClickListener {
+            setEditMode(!isEditMode)
+        }
+
+        // Tap inside the editor to unlock Edit Mode if in Read Mode
+        editRules.setOnTouchListener { _, event ->
+            if (!isEditMode && event.action == MotionEvent.ACTION_UP) {
+                setEditMode(true)
+                true
+            } else {
+                false
+            }
+        }
+
+        editorCardContainer.setOnClickListener {
+            if (!isEditMode) {
+                setEditMode(true)
+            }
+        }
 
         // Helper chips click handlers
         val chipRule = findViewById<TextView>(R.id.chipRule)
@@ -249,24 +417,43 @@ class RulesEditorActivity : AppCompatActivity() {
         val chipExt = findViewById<TextView>(R.id.chipExt)
         val chipScanDirs = findViewById<TextView>(R.id.chipScanDirs)
 
-        attachPressScale(chipRule, grow = 1.08f)
-        attachPressScale(chipDest, grow = 1.08f)
-        attachPressScale(chipExt, grow = 1.08f)
-        attachPressScale(chipScanDirs, grow = 1.08f)
+        attachSpringPress(chipRule, pressScale = 0.90f, overshoot = 4f)
+        attachSpringPress(chipDest, pressScale = 0.90f, overshoot = 4f)
+        attachSpringPress(chipExt, pressScale = 0.90f, overshoot = 4f)
+        attachSpringPress(chipScanDirs, pressScale = 0.90f, overshoot = 4f)
+
+        fun springPulseView(v: View) {
+            v.scaleX = 0.85f
+            v.scaleY = 0.85f
+            v.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(320)
+                .setInterpolator(android.view.animation.OvershootInterpolator(4f))
+                .start()
+        }
 
         chipRule.setOnClickListener {
+            springPulseView(chipRule)
+            if (!isEditMode) setEditMode(true)
             insertTextAtCursor("\n\n[custom]\ndest = /sdcard/Custom\next = txt, md")
         }
 
         chipDest.setOnClickListener {
+            springPulseView(chipDest)
+            if (!isEditMode) setEditMode(true)
             insertTextAtCursor("dest = /sdcard/Downloads/Sorted")
         }
 
         chipExt.setOnClickListener {
+            springPulseView(chipExt)
+            if (!isEditMode) setEditMode(true)
             insertTextAtCursor("ext = ")
         }
 
         chipScanDirs.setOnClickListener {
+            springPulseView(chipScanDirs)
+            if (!isEditMode) setEditMode(true)
             insertTextAtCursor("scan_dirs = /sdcard/Download")
         }
 
@@ -279,7 +466,11 @@ class RulesEditorActivity : AppCompatActivity() {
                     updateStatusPill(modified)
                 }
             }
-            override fun afterTextChanged(s: Editable?) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (!isHighlighting) {
+                    triggerSyntaxHighlighting()
+                }
+            }
         })
 
         buttonPickPath.setOnClickListener {
@@ -292,12 +483,17 @@ class RulesEditorActivity : AppCompatActivity() {
         }
 
         buttonSave.setOnClickListener {
-            saveRulesToFile(showSuccessToast = true)
+            val saved = saveRulesToFile(showSuccessToast = true)
+            if (saved) {
+                // Return to clean Read Mode after saving
+                setEditMode(false)
+            }
         }
 
         btnRunScript.setOnClickListener {
             val saved = saveRulesToFile(showSuccessToast = false)
             if (saved) {
+                setEditMode(false)
                 val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
                 val scriptPath = prefs.getString(
                     MainActivity.PREF_KEY_SCRIPT_PATH,
@@ -311,14 +507,14 @@ class RulesEditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun attachPressScale(view: View, grow: Float = 1.06f) {
+    private fun attachSpringPress(view: View, pressScale: Float = 0.94f, overshoot: Float = 3.5f) {
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.animate()
-                        .scaleX(grow)
-                        .scaleY(grow)
-                        .setDuration(90)
+                        .scaleX(pressScale)
+                        .scaleY(pressScale)
+                        .setDuration(100)
                         .setInterpolator(DecelerateInterpolator())
                         .start()
                 }
@@ -326,8 +522,8 @@ class RulesEditorActivity : AppCompatActivity() {
                     v.animate()
                         .scaleX(1f)
                         .scaleY(1f)
-                        .setDuration(120)
-                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .setDuration(350)
+                        .setInterpolator(android.view.animation.OvershootInterpolator(overshoot))
                         .start()
                 }
             }
@@ -339,6 +535,7 @@ class RulesEditorActivity : AppCompatActivity() {
         originalContent = content
         editRules.setText(content)
         updateStatusPill(false)
+        triggerSyntaxHighlighting()
     }
 
     private fun initRulesFile() {
@@ -495,13 +692,13 @@ class RulesEditorActivity : AppCompatActivity() {
 
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
-        btnCancel?.let { attachPressScale(it, grow = 1.05f) }
-        btnConfirm?.let { attachPressScale(it, grow = 1.05f) }
+        btnCancel?.let { attachSpringPress(it, pressScale = 0.94f, overshoot = 3.5f) }
+        btnConfirm?.let { attachSpringPress(it, pressScale = 0.94f, overshoot = 3.5f) }
 
         fun dismissWithAnimation() {
             cardRoot.animate()
-                .scaleX(0.92f)
-                .scaleY(0.92f)
+                .scaleX(0.90f)
+                .scaleY(0.90f)
                 .alpha(0f)
                 .setDuration(120)
                 .setInterpolator(AccelerateDecelerateInterpolator())
@@ -526,15 +723,15 @@ class RulesEditorActivity : AppCompatActivity() {
 
         dialog.show()
 
-        cardRoot.scaleX = 0.90f
-        cardRoot.scaleY = 0.90f
+        cardRoot.scaleX = 0.85f
+        cardRoot.scaleY = 0.85f
         cardRoot.alpha = 0f
         cardRoot.animate()
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setDuration(180)
-            .setInterpolator(DecelerateInterpolator())
+            .setDuration(260)
+            .setInterpolator(android.view.animation.OvershootInterpolator(3.5f))
             .start()
     }
 
@@ -552,6 +749,7 @@ class RulesEditorActivity : AppCompatActivity() {
     }
 
     private fun insertPathAtCursor(path: String) {
+        if (!isEditMode) setEditMode(true)
         insertTextAtCursor(path)
     }
 

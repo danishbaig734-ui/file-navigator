@@ -128,6 +128,44 @@
             android:orientation="vertical"
             android:padding="12dp">
 
+            <!-- Top Mode Bar inside Editor -->
+            <LinearLayout
+                android:id="@+id/rowEditorTop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:id="@+id/txtModePill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/chip_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/anta"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="5dp"
+                    android:text="📖 READ MODE • Tap to edit"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/txtRulesStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.5"
+                    android:fontFamily="@font/anta"
+                    android:text="rules.conf"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <!-- Quick Snippet Chips Bar -->
             <HorizontalScrollView
                 android:layout_width="match_parent"
