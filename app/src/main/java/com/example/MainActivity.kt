@@ -34,6 +34,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
+data class LogRun(
+    val timestamp: String,           // e.g., "21:44:34"
+    val messages: List<String>,      // e.g., ["Moved file1.m4a -> audio", "Moved file2.m4a -> audio"]
+    val summary: String?,            // e.g., "Done — 8 moved, 0 unmatched"
+    val type: LogType                // SUCCESS, ERROR, or NEUTRAL
+)
+
 /**
  * Main Activity of the application.
  * Manages manual Termux execution, script path configuration, rolling execution log, and theme.
@@ -129,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         }
         logAdapter?.let { adapter ->
             val content = LogManager.readLog(this)
-            adapter.update(parseLogRuns(content), dark)
+            adapter.update(parseLogLines(content), dark)
         }
     }
 
@@ -491,7 +498,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
-        val runs = parseLogRuns(content)
+        val runs = parseLogLines(content)
         val dark = isDarkMode()
         if (logAdapter == null) {
             logAdapter = LogEntryAdapter.fromRuns(runs, dark) { run ->
@@ -525,7 +532,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
-    fun parseLogRuns(content: String): List<LogRun> {
+    fun parseLogLines(content: String): List<LogRun> {
         val rawLines = content.lines().map { it.trim() }.filter { it.isNotEmpty() }
         if (rawLines.isEmpty()) {
             return emptyList()
@@ -537,8 +544,20 @@ class MainActivity : AppCompatActivity() {
         val runs = mutableListOf<LogRun>()
         val timestampRegex = Regex("""^(?:\d{4}-\d{2}-\d{2}\s+)?(\d{2}:\d{2}:\d{2})\s*(?:—|-|:)?\s*(.*)$""")
 
-        var currentTimestamp: String? = null
-        val currentMessages = mutableListOf<String>()
+        var currentRunTimestamp: String? = null
+        var lastTimestampSeconds: Int? = null
+        val currentRunMessages = mutableListOf<String>()
+
+        fun timeToSeconds(ts: String): Int? {
+            val parts = ts.split(":")
+            if (parts.size == 3) {
+                val h = parts[0].toIntOrNull() ?: return null
+                val m = parts[1].toIntOrNull() ?: return null
+                val s = parts[2].toIntOrNull() ?: return null
+                return h * 3600 + m * 60 + s
+            }
+            return null
+        }
 
         fun determineRunType(messages: List<String>, summary: String?): LogType {
             val hasFailed = messages.any {
@@ -568,13 +587,14 @@ class MainActivity : AppCompatActivity() {
             return LogType.NEUTRAL
         }
 
-        fun flushCurrentRun(summary: String?) {
-            if (currentMessages.isEmpty() && summary == null) return
-            val type = determineRunType(currentMessages, summary)
-            val ts = currentTimestamp ?: "—"
-            runs.add(LogRun(ts, currentMessages.toList(), summary, type))
-            currentTimestamp = null
-            currentMessages.clear()
+        fun finalizeRun(summary: String?) {
+            if (currentRunMessages.isEmpty() && summary == null) return
+            val type = determineRunType(currentRunMessages, summary)
+            val ts = currentRunTimestamp ?: "—"
+            runs.add(LogRun(timestamp = ts, messages = currentRunMessages.toList(), summary = summary, type = type))
+            currentRunTimestamp = null
+            lastTimestampSeconds = null
+            currentRunMessages.clear()
         }
 
         for (line in rawLines) {
@@ -590,48 +610,69 @@ class MainActivity : AppCompatActivity() {
                 lineMessage = line
             }
 
+            // Rule 4: Do not output lines that contain only "audio" or "video" (parsing artifact)
+            val trimmedMsg = lineMessage.trim()
+            if (trimmedMsg.equals("audio", ignoreCase = true) ||
+                trimmedMsg.equals("video", ignoreCase = true) ||
+                line.trim().equals("audio", ignoreCase = true) ||
+                line.trim().equals("video", ignoreCase = true)) {
+                continue
+            }
+
             val isDone = lineMessage.startsWith("Done —") ||
                          lineMessage.startsWith("Done -") ||
                          lineMessage.startsWith("Done:") ||
+                         lineMessage.startsWith("=== Done") ||
                          lineMessage == "Done" ||
                          line.startsWith("Done —")
 
             if (isDone) {
-                if (currentTimestamp == null && lineTimestamp != null) {
-                    currentTimestamp = lineTimestamp
+                if (currentRunTimestamp == null && lineTimestamp != null) {
+                    currentRunTimestamp = lineTimestamp
                 }
-                flushCurrentRun(summary = lineMessage)
-            } else if (lineMessage.equals("Paused", ignoreCase = true) || lineMessage.contains("Paused")) {
-                if (currentTimestamp == null && lineTimestamp != null) {
-                    currentTimestamp = lineTimestamp
-                }
-                currentMessages.add(lineMessage)
-                flushCurrentRun(summary = null)
-            } else if (lineMessage.startsWith("=== Run started") ||
-                       lineMessage.startsWith("Termux started") ||
-                       lineMessage.startsWith("tree URI re-granted")) {
-                if (currentMessages.isNotEmpty()) {
-                    flushCurrentRun(summary = null)
-                }
-                currentTimestamp = lineTimestamp
-                currentMessages.add(lineMessage)
-                if (lineMessage.startsWith("tree URI re-granted")) {
-                    flushCurrentRun(summary = null)
-                }
+                finalizeRun(summary = lineMessage)
+                continue
+            }
+
+            // Check if an interrupted run should be finalized due to explicit trigger restart or large time gap (>60s)
+            val currentSec = lineTimestamp?.let { timeToSeconds(it) }
+            val isExplicitRestart = lineMessage.startsWith("=== Run started") ||
+                                   lineMessage.startsWith("Termux started") ||
+                                   lineMessage.startsWith("tile tapped") ||
+                                   lineMessage.startsWith("tree URI re-granted")
+
+            val isTimeGap = if (lastTimestampSeconds != null && currentSec != null) {
+                val diff = currentSec - lastTimestampSeconds!!
+                diff > 60 || diff < 0
+            } else false
+
+            if ((isExplicitRestart || isTimeGap) && currentRunMessages.isNotEmpty()) {
+                finalizeRun(summary = null)
+            }
+
+            if (currentRunTimestamp == null) {
+                currentRunTimestamp = lineTimestamp ?: "—"
+            }
+            if (currentSec != null) {
+                lastTimestampSeconds = currentSec
+            }
+
+            if (lineMessage.equals("Paused", ignoreCase = true) || lineMessage.contains("Paused")) {
+                currentRunMessages.add(lineMessage)
+                finalizeRun(summary = null)
             } else {
-                if (currentTimestamp == null && lineTimestamp != null) {
-                    currentTimestamp = lineTimestamp
-                }
-                currentMessages.add(lineMessage)
+                currentRunMessages.add(lineMessage)
             }
         }
 
-        if (currentMessages.isNotEmpty()) {
-            flushCurrentRun(summary = null)
+        if (currentRunMessages.isNotEmpty()) {
+            finalizeRun(summary = null)
         }
 
         return runs
     }
+
+    fun parseLogRuns(content: String): List<LogRun> = parseLogLines(content)
 
     companion object {
         const val PREFS_NAME = "app_prefs"

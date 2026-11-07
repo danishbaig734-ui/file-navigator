@@ -12,15 +12,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 
-data class LogRun(
-    val timestamp: String,           // e.g., "13:22:41"
-    val messages: List<String>,      // e.g., ["Moved file1.mp3", "Moved file2.mp3", "Cleaned folder: X"]
-    val summary: String?,            // e.g., "Done — 17 moved, 0 unmatched"
-    val type: LogType                // SUCCESS, ERROR, or NEUTRAL
-)
-
-typealias LogRunAdapter = LogEntryAdapter
-
 class LogEntryAdapter(
     entries: List<LogEntry>,
     private var isDark: Boolean,
@@ -83,9 +74,14 @@ class LogEntryAdapter(
         holder.tvTimestamp.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
 
         // 2. Messages (joined by newlines)
-        holder.tvMessages.text = item.messages.joinToString("\n")
+        if (item.messages.isNotEmpty()) {
+            holder.tvMessages.visibility = View.VISIBLE
+            holder.tvMessages.text = item.messages.joinToString("\n")
+        } else {
+            holder.tvMessages.visibility = View.GONE
+        }
 
-        // Set message text color
+        // Set message text color (grey or green based on type)
         val msgColor = when (item.type) {
             LogType.SUCCESS -> if (isDark) 0xFF66BB6A.toInt() else 0xFF2E7D32.toInt()
             LogType.ERROR   -> if (isDark) 0xFFEF5350.toInt() else 0xFFC62828.toInt()
@@ -94,10 +90,9 @@ class LogEntryAdapter(
         holder.tvMessages.setTextColor(msgColor)
 
         // 3. Summary (Done line)
-        if (item.summary != null) {
+        if (!item.summary.isNullOrEmpty()) {
             holder.tvSummary.visibility = View.VISIBLE
             holder.tvSummary.text = item.summary
-            // Summary color logic (Green for success, Red for error)
             holder.tvSummary.setTextColor(msgColor)
         } else {
             holder.tvSummary.visibility = View.GONE
@@ -114,7 +109,7 @@ class LogEntryAdapter(
                 onRunLongClick?.invoke(item)
             } else if (onEntryLongClick != null) {
                 val legacyText = (item.messages + listOfNotNull(item.summary)).joinToString("\n")
-                onEntryLongClick?.invoke(LogEntry(item.timestamp, legacyText, item.type))
+                onEntryLongClick.invoke(LogEntry(item.timestamp, legacyText, item.type))
             } else {
                 val clipboard = view.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val textToCopy = buildString {

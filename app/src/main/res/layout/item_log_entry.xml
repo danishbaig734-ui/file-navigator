@@ -2,51 +2,47 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="4dp"
-    android:layout_marginVertical="4dp"
+    android:layout_marginHorizontal="6dp"
+    android:layout_marginVertical="5dp"
     android:background="@drawable/chip_bg"
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
     android:padding="12dp">
 
-    <!-- Header: Horizontal layout containing the timestamp pill -->
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- Top: Timestamp pill -->
+    <TextView
+        android:id="@+id/tvTimestamp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_gravity="start"
+        android:background="@drawable/log_pill_bg"
+        android:fontFamily="@font/anta"
+        android:maxLines="1"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="3dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp" />
 
-        <TextView
-            android:id="@+id/tvTimestamp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/log_pill_bg"
-            android:fontFamily="@font/anta"
-            android:maxLines="1"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="3dp"
-            android:textColor="#FFFFFF"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- Body: Actions joined by \n -->
+    <!-- Middle: Actions joined by newlines -->
     <TextView
         android:id="@+id/tvMessages"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:fontFamily="@font/anta"
-        android:lineSpacingMultiplier="1.15"
+        android:lineSpacingMultiplier="1.2"
+        android:textColor="#72B08B"
         android:textSize="11sp" />
 
-    <!-- Footer: Done line -->
+    <!-- Bottom: Done summary line -->
     <TextView
         android:id="@+id/tvSummary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:fontFamily="@font/anta"
+        android:textColor="#66BB6A"
         android:textSize="11sp"
         android:textStyle="bold" />
 
