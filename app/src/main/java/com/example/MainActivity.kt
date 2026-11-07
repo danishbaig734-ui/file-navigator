@@ -34,12 +34,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
-data class LogRun(
-    val timestamp: String,           // e.g., "2026-11-07 22:46:26"
-    val messages: List<String>,      // e.g., ["Moved file1.m4a -> audio", "Moved file2.m4a -> audio"]
-    val summary: String,             // e.g., "Done — 2 moved, 0 unmatched"
-    val type: LogType                // SUCCESS, ERROR, or NEUTRAL
-)
 
 /**
  * Main Activity of the application.
@@ -144,7 +138,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
-    private var logAdapter: LogRunAdapter? = null
+    private var logAdapter: MainLogAdapter? = null
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
 
@@ -498,73 +492,94 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
-        val runs = parseLogLines(content)
+        val entries = parseLogLines(content)
         val dark = isDarkMode()
         if (logAdapter == null) {
-            logAdapter = LogRunAdapter(runs, dark) { run ->
-                copyLogToClipboard(run)
+            logAdapter = MainLogAdapter(entries, dark) { entry ->
+                copyLogToClipboard(entry)
             }
             rvLog.adapter = logAdapter
         } else {
-            logAdapter?.update(runs, dark)
+            logAdapter?.update(entries, dark)
         }
-        if (runs.isNotEmpty()) {
+        if (entries.isNotEmpty()) {
             rvLog.post {
-                rvLog.scrollToPosition(runs.size - 1)
+                rvLog.scrollToPosition(entries.size - 1)
             }
         }
     }
 
-    private fun copyLogToClipboard(run: LogRun) {
+    private fun copyLogToClipboard(entry: MainLogEntry) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val textToCopy = buildString {
-            if (run.timestamp.isNotBlank() && run.timestamp != "—") {
-                append(run.timestamp).append("\n")
-            }
-            if (run.messages.isNotEmpty()) {
-                append(run.messages.joinToString("\n")).append("\n")
-            }
-            if (run.summary.isNotBlank()) {
-                append(run.summary)
-            }
-        }.trim()
-        val clip = android.content.ClipData.newPlainText("Log Run", textToCopy)
+        val textToCopy = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
+            "${entry.timestamp} — ${entry.message}"
+        } else {
+            entry.message
+        }
+        val clip = android.content.ClipData.newPlainText("Log Entry", textToCopy)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
-    private fun parseLogLines(rawLog: String): List<LogRun> {
-        val runs = mutableListOf<LogRun>()
-        // Split the file into distinct runs
-        val blocks = rawLog.replace("\r\n", "\n").trimEnd().split(Regex("\n---\n|\n---$"))
-        
-        for (block in blocks) {
-            val lines = block.trim().lines().filter { it.isNotBlank() }
-            if (lines.isEmpty() || lines.size < 2) continue
-            
-            // 1. Extract timestamp from first line (remove brackets)
-            val timestamp = lines[0].replace("[", "").replace("]", "")
-            
-            // 2. Extract summary from last line
-            val summary = lines.last()
-            
-            // 3. Everything in between is a message
-            val messages = if (lines.size > 2) {
-                lines.subList(1, lines.size - 1)
-            } else {
-                emptyList()
-            }
-            
-            // 4. Determine Type
-            val type = when {
-                summary.contains("Failed", ignoreCase = true) || summary.contains("error", ignoreCase = true) -> LogType.ERROR
-                summary.contains("Paused", ignoreCase = true) -> LogType.NEUTRAL
-                else -> LogType.SUCCESS
-            }
-            
-            runs.add(LogRun(timestamp, messages, summary, type))
+    private fun parseLogLines(rawLog: String): List<MainLogEntry> {
+        val clean = rawLog.replace("\r\n", "\n").trim()
+        if (clean.isEmpty() || clean == "No events recorded yet.") {
+            return listOf(MainLogEntry("—", "No events recorded yet.", LogType.NEUTRAL))
         }
-        return runs
+
+        val lines = clean.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) {
+            return listOf(MainLogEntry("—", "No events recorded yet.", LogType.NEUTRAL))
+        }
+
+        return lines.map { parseSingleLine(it) }
+    }
+
+    private fun parseSingleLine(line: String): MainLogEntry {
+        val parts = line.split(" — ", limit = 2)
+        val (rawTs, rawMsg) = if (parts.size == 2) {
+            Pair(parts[0].trim(), parts[1].trim())
+        } else {
+            val bracketMatch = Regex("^\\[(.*?)\\]\\s*(.*)$").find(line)
+            if (bracketMatch != null) {
+                Pair(bracketMatch.groupValues[1].trim(), bracketMatch.groupValues[2].trim())
+            } else {
+                Pair("—", line.trim())
+            }
+        }
+
+        val timePill = extractTimePill(rawTs)
+
+        val type = when {
+            rawMsg.contains("failed", ignoreCase = true) ||
+            rawMsg.contains("error", ignoreCase = true) ||
+            rawMsg.contains("blocked", ignoreCase = true) ||
+            rawMsg.contains("SecurityException", ignoreCase = true) -> LogType.ERROR
+
+            rawMsg.contains("Termux started", ignoreCase = true) ||
+            rawMsg.contains("Termux bound", ignoreCase = true) ||
+            rawMsg.contains("Done", ignoreCase = true) ||
+            rawMsg.contains("success", ignoreCase = true) ||
+            rawMsg.contains("MOVED", ignoreCase = true) -> LogType.SUCCESS
+
+            else -> LogType.NEUTRAL
+        }
+
+        return MainLogEntry(timePill, rawMsg, type)
+    }
+
+    private fun extractTimePill(rawTs: String): String {
+        val clean = rawTs.replace("[", "").replace("]", "").trim()
+        if (clean == "—" || clean.isEmpty()) return "—"
+        val timeMatch = Regex("\\b(\\d{2}:\\d{2}:\\d{2})\\b").find(clean)
+        if (timeMatch != null) {
+            return timeMatch.groupValues[1]
+        }
+        val timeMatchShort = Regex("\\b(\\d{2}:\\d{2})\\b").find(clean)
+        if (timeMatchShort != null) {
+            return timeMatchShort.groupValues[1]
+        }
+        return if (clean.contains(" ")) clean.substringAfterLast(" ") else clean
     }
 
     companion object {

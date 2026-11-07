@@ -130,7 +130,7 @@ class LogViewerActivity : AppCompatActivity() {
     private lateinit var rvLogViewer: RecyclerView
     private lateinit var txtEmptyLogs: TextView
 
-    private var logAdapter: LogEntryAdapter? = null
+    private var logAdapter: LogRunAdapter? = null
     private var currentTabIndex: Int = 0
     private var currentTab: LogTab = LogTab.ACTIONS
     private var isSecretLongPressDetected = false
@@ -405,20 +405,20 @@ class LogViewerActivity : AppCompatActivity() {
         val dark = isDarkMode()
 
         if (uriString == null) {
-            displayEntries(listOf(LogEntry("—", "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
+            displayEntries(listOf(LogRun("—", emptyList(), "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
             return
         }
 
         val treeUri = Uri.parse(uriString)
         val root = DocumentFile.fromTreeUri(this, treeUri)
         if (root == null || !root.canRead()) {
-            displayEntries(listOf(LogEntry("—", "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
+            displayEntries(listOf(LogRun("—", emptyList(), "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
             return
         }
 
         val logsDir = root.findFile("logs")
         if (logsDir == null || !logsDir.isDirectory) {
-            displayEntries(listOf(LogEntry("—", "(logs folder not found)", LogType.NEUTRAL)), dark)
+            displayEntries(listOf(LogRun("—", emptyList(), "(logs folder not found)", LogType.NEUTRAL)), dark)
             return
         }
 
@@ -438,15 +438,15 @@ class LogViewerActivity : AppCompatActivity() {
             val entries = if (rawContent.isEmpty()) {
                 emptyList()
             } else {
-                LogParser.parseContent(rawContent)
+                LogParser.parseLogLines(rawContent)
             }
             displayEntries(entries, dark)
         } catch (_: Exception) {
-            displayEntries(listOf(LogEntry("—", "(error reading log file)", LogType.ERROR)), dark)
+            displayEntries(listOf(LogRun("—", emptyList(), "(error reading log file)", LogType.ERROR)), dark)
         }
     }
 
-    private fun displayEntries(entries: List<LogEntry>, dark: Boolean) {
+    private fun displayEntries(entries: List<LogRun>, dark: Boolean) {
         if (entries.isEmpty()) {
             txtEmptyLogs.visibility = View.VISIBLE
             rvLogViewer.visibility = View.GONE
@@ -455,8 +455,8 @@ class LogViewerActivity : AppCompatActivity() {
             rvLogViewer.visibility = View.VISIBLE
 
             if (logAdapter == null) {
-                logAdapter = LogEntryAdapter(entries, dark) { entry ->
-                    copyLogToClipboard(entry)
+                logAdapter = LogRunAdapter(entries, dark) { run ->
+                    copyLogToClipboard(run)
                 }
                 rvLogViewer.adapter = logAdapter
             } else {
@@ -468,14 +468,20 @@ class LogViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun copyLogToClipboard(entry: LogEntry) {
+    private fun copyLogToClipboard(run: LogRun) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val textToCopy = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
-            "${entry.timestamp} — ${entry.message}"
-        } else {
-            entry.message
-        }
-        val clip = ClipData.newPlainText("Log Entry", textToCopy)
+        val textToCopy = buildString {
+            if (run.timestamp.isNotBlank() && run.timestamp != "—") {
+                append(run.timestamp).append("\n")
+            }
+            if (run.messages.isNotEmpty()) {
+                append(run.messages.joinToString("\n")).append("\n")
+            }
+            if (run.summary.isNotBlank()) {
+                append(run.summary)
+            }
+        }.trim()
+        val clip = ClipData.newPlainText("Log Run", textToCopy)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }

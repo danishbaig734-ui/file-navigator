@@ -4,9 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Example local unit test, which will execute on the development machine (host).
- *
- * See [testing documentation](http://d.android.com/tools/testing).
+ * Unit tests for LogParser and LogRun data model.
  */
 class ExampleUnitTest {
   @Test
@@ -15,96 +13,82 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testLogParser_withTimestampAndSuccess() {
-    val line = "2026-10-08 17:10:14 — MOVED file.pdf -> Documents/"
-    val entry = LogParser.parseLine(line)
-    assertEquals("17:10:14", entry.timestamp)
-    assertEquals("MOVED file.pdf -> Documents/", entry.message)
-    assertEquals(LogType.SUCCESS, entry.type)
+  fun testLogParser_singleRunSuccess() {
+    val rawLog = """
+      [2026-11-07 22:46:26]
+      Moved file1.m4a -> audio
+      Moved file2.m4a -> audio
+      Done — 2 moved, 0 unmatched
+      ---
+    """.trimIndent()
+
+    val runs = LogParser.parseLogLines(rawLog)
+    assertEquals(1, runs.size)
+    val run = runs[0]
+    assertEquals("2026-11-07 22:46:26", run.timestamp)
+    assertEquals(2, run.messages.size)
+    assertEquals("Moved file1.m4a -> audio", run.messages[0])
+    assertEquals("Moved file2.m4a -> audio", run.messages[1])
+    assertEquals("Done — 2 moved, 0 unmatched", run.summary)
+    assertEquals(LogType.SUCCESS, run.type)
   }
 
   @Test
-  fun testLogParser_withTimestampAndError() {
-    val line = "2026-10-08 17:10:14 — FAILED: permission denied"
-    val entry = LogParser.parseLine(line)
-    assertEquals("17:10:14", entry.timestamp)
-    assertEquals("FAILED: permission denied", entry.message)
-    assertEquals(LogType.ERROR, entry.type)
+  fun testLogParser_multiRunSeparatedByDashes() {
+    val rawLog = """
+      [2026-11-07 21:00:00]
+      Moved song.mp3 -> audio
+      Done — 1 moved, 0 unmatched
+      ---
+      [2026-11-07 22:00:00]
+      Moved video.mp4 -> video
+      Moved movie.mkv -> video
+      Failed: error moving file
+      ---
+    """.trimIndent()
+
+    val runs = LogParser.parseLogLines(rawLog)
+    assertEquals(2, runs.size)
+
+    assertEquals("2026-11-07 21:00:00", runs[0].timestamp)
+    assertEquals(listOf("Moved song.mp3 -> audio"), runs[0].messages)
+    assertEquals("Done — 1 moved, 0 unmatched", runs[0].summary)
+    assertEquals(LogType.SUCCESS, runs[0].type)
+
+    assertEquals("2026-11-07 22:00:00", runs[1].timestamp)
+    assertEquals(listOf("Moved video.mp4 -> video", "Moved movie.mkv -> video"), runs[1].messages)
+    assertEquals("Failed: error moving file", runs[1].summary)
+    assertEquals(LogType.ERROR, runs[1].type)
   }
 
   @Test
-  fun testLogParser_withTimestampAndNeutral() {
-    val line = "2026-10-08 17:10:14 — Rules loaded"
-    val entry = LogParser.parseLine(line)
-    assertEquals("17:10:14", entry.timestamp)
-    assertEquals("Rules loaded", entry.message)
-    assertEquals(LogType.NEUTRAL, entry.type)
+  fun testLogParser_neutralType() {
+    val rawLog = """
+      [2026-11-07 23:00:00]
+      Processing queue
+      Paused by user
+      ---
+    """.trimIndent()
+
+    val runs = LogParser.parseLogLines(rawLog)
+    assertEquals(1, runs.size)
+    assertEquals(LogType.NEUTRAL, runs[0].type)
+    assertEquals("Paused by user", runs[0].summary)
   }
 
   @Test
-  fun testLogParser_unparseableTimestamp() {
-    val line = "No events recorded yet."
-    val entry = LogParser.parseLine(line)
-    assertEquals("—", entry.timestamp)
-    assertEquals("No events recorded yet.", entry.message)
-    assertEquals(LogType.NEUTRAL, entry.type)
+  fun testLogParser_emptyOrBlank() {
+    val runs = LogParser.parseLogLines("")
+    assertTrue(runs.isEmpty())
   }
 
   @Test
-  fun testLogParser_emptyContent() {
-    val entries = LogParser.parseContent("")
-    assertEquals(1, entries.size)
-    assertEquals("—", entries[0].timestamp)
-    assertEquals("No events recorded yet.", entries[0].message)
-    assertEquals(LogType.NEUTRAL, entries[0].type)
-  }
-
-  @Test
-  fun testLogParser_startServiceAndBindServiceAreSuccess() {
-    val startEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux started via startService")
-    assertEquals(LogType.SUCCESS, startEntry.type)
-
-    val bindEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux bound via bindService")
-    assertEquals(LogType.SUCCESS, bindEntry.type)
-
-    val doneEntry = LogParser.parseLine("2026-10-08 17:10:14 — === Done (all rules applied)")
-    assertEquals(LogType.SUCCESS, doneEntry.type)
-
-    val runStartedEntry = LogParser.parseLine("2026-10-08 17:10:14 — === Run started ===")
-    assertEquals(LogType.SUCCESS, runStartedEntry.type)
-  }
-
-  @Test
-  fun testLogParser_errorPrecedenceOverSuccess() {
-    // Contains "Termux" and "intent failed" -> error should take precedence
-    val failedEntry = LogParser.parseLine("2026-10-08 17:10:14 — Termux intent failed")
-    assertEquals(LogType.ERROR, failedEntry.type)
-
-    val blockedEntry = LogParser.parseLine("2026-10-08 17:10:14 — startService blocked: IllegalStateException")
-    assertEquals(LogType.ERROR, blockedEntry.type)
-
-    val secException = LogParser.parseLine("2026-10-08 17:10:14 — SecurityException: not permitted")
-    assertEquals(LogType.ERROR, secException.type)
-
-    val saveFailed = LogParser.parseLine("2026-10-08 17:10:14 — rules.conf save failed")
-    assertEquals(LogType.ERROR, saveFailed.type)
-  }
-
-  @Test
-  fun testLogParser_neutralCases() {
-    val savedEntry = LogParser.parseLine("2026-10-08 17:10:14 — rules.conf saved")
-    assertEquals(LogType.NEUTRAL, savedEntry.type)
-
-    val collisionEntry = LogParser.parseLine("2026-10-08 17:10:14 — COLLISION: file already exists")
-    assertEquals(LogType.NEUTRAL, collisionEntry.type)
-
-    val removedEntry = LogParser.parseLine("2026-10-08 17:10:14 — REMOVED empty folder")
-    assertEquals(LogType.NEUTRAL, removedEntry.type)
-
-    val regrantedEntry = LogParser.parseLine("2026-10-08 17:10:14 — tree URI re-granted")
-    assertEquals(LogType.NEUTRAL, regrantedEntry.type)
-
-    val ignoreSaved = LogParser.parseLine("2026-10-08 17:10:14 — ignore list saved")
-    assertEquals(LogType.NEUTRAL, ignoreSaved.type)
+  fun testLogParser_singleLineStatus() {
+    val rawLog = "(tree URI invalid — re-grant folder access)"
+    val runs = LogParser.parseLogLines(rawLog)
+    assertEquals(1, runs.size)
+    assertEquals("—", runs[0].timestamp)
+    assertEquals("(tree URI invalid — re-grant folder access)", runs[0].summary)
+    assertTrue(runs[0].messages.isEmpty())
   }
 }
