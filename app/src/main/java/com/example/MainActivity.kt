@@ -129,7 +129,7 @@ class MainActivity : AppCompatActivity() {
         }
         logAdapter?.let { adapter ->
             val content = LogManager.readLog(this)
-            adapter.update(LogParser.parseContent(content), dark)
+            adapter.update(parseLogRuns(content), dark)
         }
     }
 
@@ -491,33 +491,146 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshLogDisplay() {
         val content = LogManager.readLog(this)
-        val entries = LogParser.parseContent(content)
+        val runs = parseLogRuns(content)
         val dark = isDarkMode()
         if (logAdapter == null) {
-            logAdapter = LogEntryAdapter(entries, dark) { entry ->
-                copyLogToClipboard(entry)
+            logAdapter = LogEntryAdapter.fromRuns(runs, dark) { run ->
+                copyLogToClipboard(run)
             }
             rvLog.adapter = logAdapter
         } else {
-            logAdapter?.update(entries, dark)
+            logAdapter?.update(runs, dark)
         }
-        if (entries.isNotEmpty()) {
+        if (runs.isNotEmpty()) {
             rvLog.post {
-                rvLog.scrollToPosition(entries.size - 1)
+                rvLog.scrollToPosition(runs.size - 1)
             }
         }
     }
 
-    private fun copyLogToClipboard(entry: LogEntry) {
+    private fun copyLogToClipboard(run: LogRun) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val textToCopy = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
-            "${entry.timestamp} — ${entry.message}"
-        } else {
-            entry.message
+        val textToCopy = buildString {
+            if (run.timestamp.isNotBlank() && run.timestamp != "—") {
+                append(run.timestamp).append(" — ")
+            }
+            append(run.messages.joinToString("\n"))
+            if (!run.summary.isNullOrEmpty()) {
+                if (isNotEmpty()) append("\n")
+                append(run.summary)
+            }
         }
-        val clip = android.content.ClipData.newPlainText("Log Entry", textToCopy)
+        val clip = android.content.ClipData.newPlainText("Log Run", textToCopy)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
+    }
+
+    fun parseLogRuns(content: String): List<LogRun> {
+        val rawLines = content.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (rawLines.isEmpty()) {
+            return emptyList()
+        }
+        if (rawLines.size == 1 && rawLines[0] == "No events recorded yet.") {
+            return listOf(LogRun("—", listOf("No events recorded yet."), null, LogType.NEUTRAL))
+        }
+
+        val runs = mutableListOf<LogRun>()
+        val timestampRegex = Regex("""^(?:\d{4}-\d{2}-\d{2}\s+)?(\d{2}:\d{2}:\d{2})\s*(?:—|-|:)?\s*(.*)$""")
+
+        var currentTimestamp: String? = null
+        val currentMessages = mutableListOf<String>()
+
+        fun determineRunType(messages: List<String>, summary: String?): LogType {
+            val hasFailed = messages.any {
+                it.contains("Failed", ignoreCase = true) ||
+                it.contains("Error", ignoreCase = true) ||
+                it.contains("blocked", ignoreCase = true) ||
+                it.contains("Exception", ignoreCase = true)
+            } || (summary?.let {
+                it.contains("Failed", ignoreCase = true) ||
+                it.contains("Error", ignoreCase = true)
+            } == true)
+
+            if (hasFailed) return LogType.ERROR
+
+            if (summary != null && summary.contains("moved", ignoreCase = true)) {
+                return LogType.SUCCESS
+            }
+
+            if (messages.any {
+                (!it.contains("REMOVED") && it.contains("MOVED", ignoreCase = true)) ||
+                it.contains("startService") ||
+                it.contains("bindService")
+            }) {
+                return LogType.SUCCESS
+            }
+
+            return LogType.NEUTRAL
+        }
+
+        fun flushCurrentRun(summary: String?) {
+            if (currentMessages.isEmpty() && summary == null) return
+            val type = determineRunType(currentMessages, summary)
+            val ts = currentTimestamp ?: "—"
+            runs.add(LogRun(ts, currentMessages.toList(), summary, type))
+            currentTimestamp = null
+            currentMessages.clear()
+        }
+
+        for (line in rawLines) {
+            val match = timestampRegex.matchEntire(line)
+            val lineTimestamp: String?
+            val lineMessage: String
+            if (match != null) {
+                lineTimestamp = match.groupValues[1]
+                val rest = match.groupValues[2].trim()
+                lineMessage = if (rest.isNotEmpty()) rest else line
+            } else {
+                lineTimestamp = null
+                lineMessage = line
+            }
+
+            val isDone = lineMessage.startsWith("Done —") ||
+                         lineMessage.startsWith("Done -") ||
+                         lineMessage.startsWith("Done:") ||
+                         lineMessage == "Done" ||
+                         line.startsWith("Done —")
+
+            if (isDone) {
+                if (currentTimestamp == null && lineTimestamp != null) {
+                    currentTimestamp = lineTimestamp
+                }
+                flushCurrentRun(summary = lineMessage)
+            } else if (lineMessage.equals("Paused", ignoreCase = true) || lineMessage.contains("Paused")) {
+                if (currentTimestamp == null && lineTimestamp != null) {
+                    currentTimestamp = lineTimestamp
+                }
+                currentMessages.add(lineMessage)
+                flushCurrentRun(summary = null)
+            } else if (lineMessage.startsWith("=== Run started") ||
+                       lineMessage.startsWith("Termux started") ||
+                       lineMessage.startsWith("tree URI re-granted")) {
+                if (currentMessages.isNotEmpty()) {
+                    flushCurrentRun(summary = null)
+                }
+                currentTimestamp = lineTimestamp
+                currentMessages.add(lineMessage)
+                if (lineMessage.startsWith("tree URI re-granted")) {
+                    flushCurrentRun(summary = null)
+                }
+            } else {
+                if (currentTimestamp == null && lineTimestamp != null) {
+                    currentTimestamp = lineTimestamp
+                }
+                currentMessages.add(lineMessage)
+            }
+        }
+
+        if (currentMessages.isNotEmpty()) {
+            flushCurrentRun(summary = null)
+        }
+
+        return runs
     }
 
     companion object {
