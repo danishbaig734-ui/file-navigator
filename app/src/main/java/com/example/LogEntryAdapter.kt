@@ -12,39 +12,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 
-class LogEntryAdapter(
-    entries: List<LogEntry>,
-    private var isDark: Boolean,
-    private val onEntryLongClick: ((LogEntry) -> Unit)? = null
-) : RecyclerView.Adapter<LogEntryAdapter.VH>() {
-
-    private var items: List<LogRun> = entries.map { entry ->
-        LogRun(
-            timestamp = entry.timestamp,
-            messages = if (entry.message.isNotEmpty()) listOf(entry.message) else emptyList(),
-            summary = null,
-            type = entry.type
-        )
-    }
-    private var onRunLongClick: ((LogRun) -> Unit)? = null
-
-    constructor(
-        runs: List<LogRun>,
-        isDark: Boolean,
-        onRunLongClick: ((LogRun) -> Unit)?,
-        @Suppress("UNUSED_PARAMETER") forRuns: Unit = Unit
-    ) : this(emptyList<LogEntry>(), isDark, null) {
-        this.items = runs
-        this.onRunLongClick = onRunLongClick
-    }
-
-    companion object {
-        fun fromRuns(
-            runs: List<LogRun>,
-            isDark: Boolean,
-            onRunLongClick: ((LogRun) -> Unit)? = null
-        ): LogEntryAdapter = LogEntryAdapter(runs, isDark, onRunLongClick, Unit)
-    }
+open class LogRunAdapter(
+    protected var items: List<LogRun>,
+    protected var isDark: Boolean,
+    private val onItemLongClick: ((LogRun) -> Unit)? = null
+) : RecyclerView.Adapter<LogRunAdapter.VH>() {
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val tvTimestamp: TextView = view.findViewById(R.id.tvTimestamp)
@@ -73,7 +45,7 @@ class LogEntryAdapter(
         holder.tvTimestamp.setBackgroundResource(pillRes)
         holder.tvTimestamp.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
 
-        // 2. Messages (joined by newlines)
+        // 2. Messages (joined by newlines). If empty, hide tvMessages
         if (item.messages.isNotEmpty()) {
             holder.tvMessages.visibility = View.VISIBLE
             holder.tvMessages.text = item.messages.joinToString("\n")
@@ -81,7 +53,6 @@ class LogEntryAdapter(
             holder.tvMessages.visibility = View.GONE
         }
 
-        // Set message text color (grey or green based on type)
         val msgColor = when (item.type) {
             LogType.SUCCESS -> if (isDark) 0xFF66BB6A.toInt() else 0xFF2E7D32.toInt()
             LogType.ERROR   -> if (isDark) 0xFFEF5350.toInt() else 0xFFC62828.toInt()
@@ -90,7 +61,7 @@ class LogEntryAdapter(
         holder.tvMessages.setTextColor(msgColor)
 
         // 3. Summary (Done line)
-        if (!item.summary.isNullOrEmpty()) {
+        if (item.summary.isNotBlank()) {
             holder.tvSummary.visibility = View.VISIBLE
             holder.tvSummary.text = item.summary
             holder.tvSummary.setTextColor(msgColor)
@@ -105,23 +76,21 @@ class LogEntryAdapter(
         // Long click copy logic
         holder.itemView.setOnLongClickListener { view ->
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            if (onRunLongClick != null) {
-                onRunLongClick?.invoke(item)
-            } else if (onEntryLongClick != null) {
-                val legacyText = (item.messages + listOfNotNull(item.summary)).joinToString("\n")
-                onEntryLongClick.invoke(LogEntry(item.timestamp, legacyText, item.type))
+            if (onItemLongClick != null) {
+                onItemLongClick.invoke(item)
             } else {
                 val clipboard = view.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val textToCopy = buildString {
                     if (item.timestamp.isNotBlank() && item.timestamp != "—") {
-                        append(item.timestamp).append(" — ")
+                        append(item.timestamp).append("\n")
                     }
-                    append(item.messages.joinToString("\n"))
-                    if (!item.summary.isNullOrEmpty()) {
-                        if (isNotEmpty()) append("\n")
+                    if (item.messages.isNotEmpty()) {
+                        append(item.messages.joinToString("\n")).append("\n")
+                    }
+                    if (item.summary.isNotBlank()) {
                         append(item.summary)
                     }
-                }
+                }.trim()
                 clipboard.setPrimaryClip(ClipData.newPlainText("Log Run", textToCopy))
                 Toast.makeText(view.context, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
             }
@@ -129,24 +98,55 @@ class LogEntryAdapter(
         }
     }
 
-    @JvmName("updateRuns")
-    fun update(newItems: List<LogRun>, dark: Boolean) {
+    open fun update(newItems: List<LogRun>, dark: Boolean) {
         items = newItems
         isDark = dark
         notifyDataSetChanged()
     }
+}
 
+/**
+ * Backward compatibility adapter for LogViewerActivity and TechnicalLogActivity
+ */
+class LogEntryAdapter(
+    entries: List<LogEntry>,
+    isDark: Boolean,
+    private val onEntryLongClick: ((LogEntry) -> Unit)? = null
+) : LogRunAdapter(
+    items = entries.map { entry ->
+        LogRun(
+            timestamp = entry.timestamp,
+            messages = if (entry.message.isNotEmpty()) listOf(entry.message) else emptyList(),
+            summary = "",
+            type = entry.type
+        )
+    },
+    isDark = isDark,
+    onItemLongClick = null
+) {
     @JvmName("updateEntries")
     fun update(newEntries: List<LogEntry>, dark: Boolean) {
-        items = newEntries.map { entry ->
+        val runs = newEntries.map { entry ->
             LogRun(
                 timestamp = entry.timestamp,
                 messages = if (entry.message.isNotEmpty()) listOf(entry.message) else emptyList(),
-                summary = null,
+                summary = "",
                 type = entry.type
             )
         }
-        isDark = dark
-        notifyDataSetChanged()
+        super.update(runs, dark)
+    }
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        super.onBindViewHolder(holder, position)
+        if (onEntryLongClick != null) {
+            val item = items[position]
+            holder.itemView.setOnLongClickListener { view ->
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                val legacyText = (item.messages + listOf(item.summary)).filter { it.isNotBlank() }.joinToString("\n")
+                onEntryLongClick.invoke(LogEntry(item.timestamp, legacyText, item.type))
+                true
+            }
+        }
     }
 }

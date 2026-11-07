@@ -35,9 +35,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 data class LogRun(
-    val timestamp: String,           // e.g., "21:44:34"
+    val timestamp: String,           // e.g., "2026-11-07 22:46:26"
     val messages: List<String>,      // e.g., ["Moved file1.m4a -> audio", "Moved file2.m4a -> audio"]
-    val summary: String?,            // e.g., "Done — 8 moved, 0 unmatched"
+    val summary: String,             // e.g., "Done — 2 moved, 0 unmatched"
     val type: LogType                // SUCCESS, ERROR, or NEUTRAL
 )
 
@@ -144,7 +144,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
-    private var logAdapter: LogEntryAdapter? = null
+    private var logAdapter: LogRunAdapter? = null
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
 
@@ -501,7 +501,7 @@ class MainActivity : AppCompatActivity() {
         val runs = parseLogLines(content)
         val dark = isDarkMode()
         if (logAdapter == null) {
-            logAdapter = LogEntryAdapter.fromRuns(runs, dark) { run ->
+            logAdapter = LogRunAdapter(runs, dark) { run ->
                 copyLogToClipboard(run)
             }
             rvLog.adapter = logAdapter
@@ -519,160 +519,53 @@ class MainActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val textToCopy = buildString {
             if (run.timestamp.isNotBlank() && run.timestamp != "—") {
-                append(run.timestamp).append(" — ")
+                append(run.timestamp).append("\n")
             }
-            append(run.messages.joinToString("\n"))
-            if (!run.summary.isNullOrEmpty()) {
-                if (isNotEmpty()) append("\n")
+            if (run.messages.isNotEmpty()) {
+                append(run.messages.joinToString("\n")).append("\n")
+            }
+            if (run.summary.isNotBlank()) {
                 append(run.summary)
             }
-        }
+        }.trim()
         val clip = android.content.ClipData.newPlainText("Log Run", textToCopy)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
-    fun parseLogLines(content: String): List<LogRun> {
-        val rawLines = content.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        if (rawLines.isEmpty()) {
-            return emptyList()
-        }
-        if (rawLines.size == 1 && rawLines[0] == "No events recorded yet.") {
-            return listOf(LogRun("—", listOf("No events recorded yet."), null, LogType.NEUTRAL))
-        }
-
+    private fun parseLogLines(rawLog: String): List<LogRun> {
         val runs = mutableListOf<LogRun>()
-        val timestampRegex = Regex("""^(?:\d{4}-\d{2}-\d{2}\s+)?(\d{2}:\d{2}:\d{2})\s*(?:—|-|:)?\s*(.*)$""")
-
-        var currentRunTimestamp: String? = null
-        var lastTimestampSeconds: Int? = null
-        val currentRunMessages = mutableListOf<String>()
-
-        fun timeToSeconds(ts: String): Int? {
-            val parts = ts.split(":")
-            if (parts.size == 3) {
-                val h = parts[0].toIntOrNull() ?: return null
-                val m = parts[1].toIntOrNull() ?: return null
-                val s = parts[2].toIntOrNull() ?: return null
-                return h * 3600 + m * 60 + s
-            }
-            return null
-        }
-
-        fun determineRunType(messages: List<String>, summary: String?): LogType {
-            val hasFailed = messages.any {
-                it.contains("Failed", ignoreCase = true) ||
-                it.contains("Error", ignoreCase = true) ||
-                it.contains("blocked", ignoreCase = true) ||
-                it.contains("Exception", ignoreCase = true)
-            } || (summary?.let {
-                it.contains("Failed", ignoreCase = true) ||
-                it.contains("Error", ignoreCase = true)
-            } == true)
-
-            if (hasFailed) return LogType.ERROR
-
-            if (summary != null && summary.contains("moved", ignoreCase = true)) {
-                return LogType.SUCCESS
-            }
-
-            if (messages.any {
-                (!it.contains("REMOVED") && it.contains("MOVED", ignoreCase = true)) ||
-                it.contains("startService") ||
-                it.contains("bindService")
-            }) {
-                return LogType.SUCCESS
-            }
-
-            return LogType.NEUTRAL
-        }
-
-        fun finalizeRun(summary: String?) {
-            if (currentRunMessages.isEmpty() && summary == null) return
-            val type = determineRunType(currentRunMessages, summary)
-            val ts = currentRunTimestamp ?: "—"
-            runs.add(LogRun(timestamp = ts, messages = currentRunMessages.toList(), summary = summary, type = type))
-            currentRunTimestamp = null
-            lastTimestampSeconds = null
-            currentRunMessages.clear()
-        }
-
-        for (line in rawLines) {
-            val match = timestampRegex.matchEntire(line)
-            val lineTimestamp: String?
-            val lineMessage: String
-            if (match != null) {
-                lineTimestamp = match.groupValues[1]
-                val rest = match.groupValues[2].trim()
-                lineMessage = if (rest.isNotEmpty()) rest else line
+        // Split the file into distinct runs
+        val blocks = rawLog.replace("\r\n", "\n").trimEnd().split(Regex("\n---\n|\n---$"))
+        
+        for (block in blocks) {
+            val lines = block.trim().lines().filter { it.isNotBlank() }
+            if (lines.isEmpty() || lines.size < 2) continue
+            
+            // 1. Extract timestamp from first line (remove brackets)
+            val timestamp = lines[0].replace("[", "").replace("]", "")
+            
+            // 2. Extract summary from last line
+            val summary = lines.last()
+            
+            // 3. Everything in between is a message
+            val messages = if (lines.size > 2) {
+                lines.subList(1, lines.size - 1)
             } else {
-                lineTimestamp = null
-                lineMessage = line
+                emptyList()
             }
-
-            // Rule 4: Do not output lines that contain only "audio" or "video" (parsing artifact)
-            val trimmedMsg = lineMessage.trim()
-            if (trimmedMsg.equals("audio", ignoreCase = true) ||
-                trimmedMsg.equals("video", ignoreCase = true) ||
-                line.trim().equals("audio", ignoreCase = true) ||
-                line.trim().equals("video", ignoreCase = true)) {
-                continue
+            
+            // 4. Determine Type
+            val type = when {
+                summary.contains("Failed", ignoreCase = true) || summary.contains("error", ignoreCase = true) -> LogType.ERROR
+                summary.contains("Paused", ignoreCase = true) -> LogType.NEUTRAL
+                else -> LogType.SUCCESS
             }
-
-            val isDone = lineMessage.startsWith("Done —") ||
-                         lineMessage.startsWith("Done -") ||
-                         lineMessage.startsWith("Done:") ||
-                         lineMessage.startsWith("=== Done") ||
-                         lineMessage == "Done" ||
-                         line.startsWith("Done —")
-
-            if (isDone) {
-                if (currentRunTimestamp == null && lineTimestamp != null) {
-                    currentRunTimestamp = lineTimestamp
-                }
-                finalizeRun(summary = lineMessage)
-                continue
-            }
-
-            // Check if an interrupted run should be finalized due to explicit trigger restart or large time gap (>60s)
-            val currentSec = lineTimestamp?.let { timeToSeconds(it) }
-            val isExplicitRestart = lineMessage.startsWith("=== Run started") ||
-                                   lineMessage.startsWith("Termux started") ||
-                                   lineMessage.startsWith("tile tapped") ||
-                                   lineMessage.startsWith("tree URI re-granted")
-
-            val isTimeGap = if (lastTimestampSeconds != null && currentSec != null) {
-                val diff = currentSec - lastTimestampSeconds!!
-                diff > 60 || diff < 0
-            } else false
-
-            if ((isExplicitRestart || isTimeGap) && currentRunMessages.isNotEmpty()) {
-                finalizeRun(summary = null)
-            }
-
-            if (currentRunTimestamp == null) {
-                currentRunTimestamp = lineTimestamp ?: "—"
-            }
-            if (currentSec != null) {
-                lastTimestampSeconds = currentSec
-            }
-
-            if (lineMessage.equals("Paused", ignoreCase = true) || lineMessage.contains("Paused")) {
-                currentRunMessages.add(lineMessage)
-                finalizeRun(summary = null)
-            } else {
-                currentRunMessages.add(lineMessage)
-            }
+            
+            runs.add(LogRun(timestamp, messages, summary, type))
         }
-
-        if (currentRunMessages.isNotEmpty()) {
-            finalizeRun(summary = null)
-        }
-
         return runs
     }
-
-    fun parseLogRuns(content: String): List<LogRun> = parseLogLines(content)
 
     companion object {
         const val PREFS_NAME = "app_prefs"
