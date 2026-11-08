@@ -635,16 +635,14 @@ class MainActivity : AppCompatActivity() {
                     val status = withContext(Dispatchers.IO) {
                         if (statusFile.exists()) statusFile.readText().trim() else "starting"
                     }
-                    if (status == "working") {
-                        isAwake = true
-                    }
+                    if (status == "working") isAwake = true
                     wakeAttempts++
                     if (wakeAttempts > 100) { // Safety timeout ~10s
                         isAwake = true
                     }
                 }
 
-                // PHASE 2 & 3: Dramatic Loop while Termux works
+                // PHASE 2: Dramatic Loop + Non-blocking check
                 val fakeMessages = listOf(
                     "Scanning extensions...",
                     "Reading rules...",
@@ -654,43 +652,48 @@ class MainActivity : AppCompatActivity() {
                 var i = 0
                 var isDone = false
 
-                while (isActive && !isDone) {
-                    val msg = fakeMessages[i % fakeMessages.size]
-                    withContext(Dispatchers.Main) { typeText(msg) }
-
-                    val status = withContext(Dispatchers.IO) {
-                        if (statusFile.exists()) statusFile.readText().trim() else "working"
-                    }
-
-                    // STRICTLY wait for "done". Termux only writes this after wake unlock.
-                    if (status == "done") {
-                        isDone = true
-                        break
-                    }
-
-                    i++
-                    delay(300)
-                    if (i > 40) {
-                        break
+                // Launch a background watcher for "done"
+                val watcherJob = launch(Dispatchers.IO) {
+                    while (isActive) {
+                        delay(100) // check every 100ms
+                        val status = if (statusFile.exists()) statusFile.readText().trim() else "working"
+                        if (status == "done") {
+                            isDone = true
+                            break
+                        }
                     }
                 }
 
-                // PHASE 4: Finish
+                // The typing loop
+                while (isActive && !isDone) {
+                    val msg = fakeMessages[i % fakeMessages.size]
+                    withContext(Dispatchers.Main) { typeText(msg, checkAbort = { isDone }) }
+                    if (!isDone) {
+                        i++
+                        delay(300)
+                    }
+                }
+
+                watcherJob.cancel() // stop the watcher
+
+                // PHASE 3: Instant Finish
                 withContext(Dispatchers.Main) {
-                    typeText("Done!")
-                    delay(1000)
+                    // Do NOT type "Done!" character by character. Show it instantly.
+                    tvButtonLabel.text = "Done!"
+                    delay(300) // Tiny pause so the user can read it
                     stopAndResetButton()
                 }
             }
         }
     }
 
-    // Helper for fast typing
-    private suspend fun typeText(text: String, delayMs: Long = 20) {
+    // Modify typeText to abort immediately if isDone becomes true
+    private suspend fun typeText(text: String, checkAbort: (() -> Boolean)? = null) {
         tvButtonLabel.text = ""
         for (char in text) {
+            if (checkAbort?.invoke() == true) break // Abort typing mid-sentence!
             tvButtonLabel.append(char.toString())
-            delay(delayMs)
+            delay(20)
         }
     }
 
