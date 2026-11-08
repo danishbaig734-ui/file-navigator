@@ -274,6 +274,17 @@ class MainActivity : AppCompatActivity() {
             }
             if (isRunning) return@setOnClickListener
 
+            // Write "starting" to the file IMMEDIATELY so we don't read stale "done" data
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val statusFile = File("/sdcard/FileNavigator/status.txt")
+                    statusFile.parentFile?.mkdirs()
+                    statusFile.writeText("starting")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
                 DEFAULT_SCRIPT_PATH
@@ -616,24 +627,24 @@ class MainActivity : AppCompatActivity() {
 
                 withContext(Dispatchers.Main) { typeText("Waking Termux...") }
 
-                // PHASE 1: Wait for Termux to actually wake up (write "starting" or "working")
+                // PHASE 1: Wait for Termux to write "working"
                 var isAwake = false
                 var wakeAttempts = 0
                 while (isActive && !isAwake) {
                     delay(100)
                     val status = withContext(Dispatchers.IO) {
-                        if (statusFile.exists()) statusFile.readText().trim() else "idle"
+                        if (statusFile.exists()) statusFile.readText().trim() else "starting"
                     }
-                    if (status == "starting" || status == "working") {
+                    if (status == "working") {
                         isAwake = true
                     }
                     wakeAttempts++
-                    if (wakeAttempts > 80) { // Safety timeout ~8s
+                    if (wakeAttempts > 100) { // Safety timeout ~10s
                         isAwake = true
                     }
                 }
 
-                // PHASE 2 & 3: Dramatic Loop + Check for "done"
+                // PHASE 2 & 3: Dramatic Loop while Termux works
                 val fakeMessages = listOf(
                     "Scanning extensions...",
                     "Reading rules...",
@@ -644,24 +655,22 @@ class MainActivity : AppCompatActivity() {
                 var isDone = false
 
                 while (isActive && !isDone) {
-                    // 1. Type one fake message
                     val msg = fakeMessages[i % fakeMessages.size]
                     withContext(Dispatchers.Main) { typeText(msg) }
 
-                    // 2. Check the real status file
                     val status = withContext(Dispatchers.IO) {
-                        if (statusFile.exists()) statusFile.readText().trim() else "idle"
+                        if (statusFile.exists()) statusFile.readText().trim() else "working"
                     }
 
-                    // 3. If Termux finished, break the loop
-                    if (status == "done" || status == "idle") {
+                    // STRICTLY wait for "done". Termux only writes this after wake unlock.
+                    if (status == "done") {
                         isDone = true
                         break
                     }
 
                     i++
-                    delay(300) // Small pause so the text is readable
-                    if (i > 30) {
+                    delay(300)
+                    if (i > 40) {
                         break
                     }
                 }
