@@ -95,10 +95,28 @@
                 android:contentDescription="Run Script Now"
                 android:padding="20dp"
                 android:scaleType="centerInside"
-                android:src="@android:drawable/ic_media_play"
+                android:src="@drawable/ic_play"
                 app:layout_constraintBottom_toBottomOf="@id/txtSubtitle"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="@id/txtHeaderTitle" />
+
+            <TextView
+                android:id="@+id/tvButtonLabel"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:elevation="8dp"
+                android:gravity="center"
+                android:visibility="invisible"
+                android:textSize="11sp"
+                android:fontFamily="@font/anta"
+                android:textStyle="bold"
+                android:paddingHorizontal="6dp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                app:layout_constraintStart_toStartOf="@id/btnRunScript"
+                app:layout_constraintEnd_toEndOf="@id/btnRunScript"
+                app:layout_constraintTop_toTopOf="@id/btnRunScript"
+                app:layout_constraintBottom_toBottomOf="@id/btnRunScript" />
 
             <Button
                 android:id="@+id/btnEditRules"

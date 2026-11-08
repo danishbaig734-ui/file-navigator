@@ -33,8 +33,12 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-
-
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.*
+import java.io.File
 /**
  * Main Activity of the application.
  * Manages manual Termux execution, script path configuration, rolling execution log, and theme.
@@ -89,6 +93,7 @@ class MainActivity : AppCompatActivity() {
             ?: runBtn.background.mutate() as? GradientDrawable
         runBgDrawable?.setColor(runBtnBg)
         runBtn.setColorFilter(runBtnIcon)
+        findViewById<TextView>(R.id.tvButtonLabel)?.setTextColor(runBtnIcon)
 
         // 7. Secondary buttons (and refresh/clear log buttons)
         val editRulesBtn = findViewById<Button>(R.id.btnEditRules)
@@ -134,7 +139,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private lateinit var btnRunScript: ImageButton
     private lateinit var buttonRun: ImageButton
+    private lateinit var tvButtonLabel: TextView
+    private var isRunning = false
+    private var thinkingJob: Job? = null
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
@@ -229,10 +238,17 @@ class MainActivity : AppCompatActivity() {
         LogManager.setListener(null)
         permissionDialog?.dismiss()
         permissionDialog = null
+        if (isRunning) {
+            thinkingJob?.cancel()
+            thinkingJob = null
+            stopAndResetButton()
+        }
     }
 
     private fun initViews() {
-        buttonRun = findViewById(R.id.btnRunScript)
+        btnRunScript = findViewById(R.id.btnRunScript)
+        buttonRun = btnRunScript
+        tvButtonLabel = findViewById(R.id.tvButtonLabel)
         buttonEditRules = findViewById(R.id.btnEditRules)
         buttonViewLogs = findViewById(R.id.btnViewLogs)
         rvLog = findViewById(R.id.rvLog)
@@ -256,11 +272,14 @@ class MainActivity : AppCompatActivity() {
                 showPermissionDialog()
                 return@setOnClickListener
             }
+            if (isRunning) return@setOnClickListener
+
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
                 DEFAULT_SCRIPT_PATH
             } ?: DEFAULT_SCRIPT_PATH
             dispatchTermux(this, currentPath)
+            startTermuxAnimation()
         }
 
         buttonEditRules.setOnClickListener {
@@ -293,6 +312,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun attachPressScale(view: View, grow: Float = 1.06f) {
         view.setOnTouchListener { v, event ->
+            if (v == btnRunScript && isRunning) {
+                return@setOnTouchListener false
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.animate()
@@ -580,6 +602,151 @@ class MainActivity : AppCompatActivity() {
             return timeMatchShort.groupValues[1]
         }
         return if (clean.contains(" ")) clean.substringAfterLast(" ") else clean
+    }
+
+    private fun readStatusFile(file: File = File("/sdcard/FileNavigator/status.txt")): String {
+        return try {
+            if (file.exists() && file.canRead()) {
+                file.readText().trim()
+            } else {
+                "idle"
+            }
+        } catch (_: Exception) {
+            "idle"
+        }
+    }
+
+    private fun startTermuxAnimation() {
+        if (isRunning) return
+        isRunning = true
+        btnRunScript.setImageDrawable(null)
+
+        morph(toSquare = true) {
+            tvButtonLabel.visibility = View.VISIBLE
+            thinkingJob = lifecycleScope.launch(Dispatchers.IO) {
+                val statusFile = File("/sdcard/FileNavigator/status.txt")
+
+                // Phase 1: Wait for "working"
+                withContext(Dispatchers.Main) {
+                    typeText("Starting Termux...")
+                }
+
+                var phase1Count = 0
+                while (isActive) {
+                    delay(200) // Check file every 200ms
+                    val status = readStatusFile(statusFile)
+
+                    if (status == "working" || status == "done") {
+                        break // Move to Phase 2
+                    }
+                    phase1Count++
+                    if (phase1Count > 15) { // Safety timeout ~3s
+                        break
+                    }
+                }
+
+                // Phase 2: Dramatic Thinking Loop
+                withContext(Dispatchers.Main) {
+                    runDramaticLoop()
+                }
+
+                // Phase 3: Wait for "done" or "idle"
+                var phase3Count = 0
+                while (isActive) {
+                    delay(200)
+                    val status = readStatusFile(statusFile)
+
+                    if (status == "done" || status == "idle") {
+                        break // Move to Phase 4
+                    }
+                    phase3Count++
+                    if (phase3Count > 25) { // Safety timeout ~5s
+                        break
+                    }
+                }
+
+                // Phase 4: Finish
+                withContext(Dispatchers.Main) {
+                    typeText("Done!")
+                    delay(800) // Hold "Done!" for a moment
+                    stopAndResetButton()
+                }
+            }
+        }
+    }
+
+    // Helper for fast typing
+    private suspend fun typeText(text: String, delayMs: Long = 20) {
+        tvButtonLabel.text = ""
+        for (char in text) {
+            tvButtonLabel.append(char.toString())
+            delay(delayMs)
+        }
+    }
+
+    // The Fake AI Loop to hide the 2-second delay
+    private suspend fun CoroutineScope.runDramaticLoop() {
+        val fakeMessages = listOf(
+            "Analyzing extensions...",
+            "Checking rules...",
+            "Moving files...",
+            "Cleaning up..."
+        )
+        val statusFile = File("/sdcard/FileNavigator/status.txt")
+        var i = 0
+        while (isActive && isRunning) {
+            typeText(fakeMessages[i % fakeMessages.size])
+            delay(300)
+            i++
+            // This loop will break as soon as Phase 3 detects "done" in the background
+            val status = withContext(Dispatchers.IO) { readStatusFile(statusFile) }
+            if (status == "done" || status == "idle") {
+                break
+            }
+            if (i > 20) break // Safety break so it doesn't run forever
+        }
+    }
+
+    private fun stopAndResetButton() {
+        tvButtonLabel.text = ""
+        tvButtonLabel.visibility = View.INVISIBLE
+        morph(toSquare = false) {
+            btnRunScript.setImageResource(R.drawable.ic_play)
+            isRunning = false
+        }
+    }
+
+    private fun morph(toSquare: Boolean, onEnd: () -> Unit) {
+        val density = resources.displayMetrics.density
+        val startWidth = if (btnRunScript.width > 0) btnRunScript.width else (72 * density).toInt()
+        val targetWidth = if (toSquare) (160 * density).toInt() else (72 * density).toInt()
+        val startRadius = if (toSquare) 36f * density else 16f * density
+        val targetRadius = if (toSquare) 16f * density else 36f * density
+
+        val bgDrawable = (btnRunScript.background.mutate() as? android.graphics.drawable.RippleDrawable)?.getDrawable(0) as? GradientDrawable
+            ?: btnRunScript.background.mutate() as? GradientDrawable
+
+        val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 250
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animator ->
+                val fraction = animator.animatedFraction
+                val currentWidth = (startWidth + (targetWidth - startWidth) * fraction).toInt()
+                val currentRadius = startRadius + (targetRadius - startRadius) * fraction
+
+                val params = btnRunScript.layoutParams
+                params.width = currentWidth
+                btnRunScript.layoutParams = params
+
+                bgDrawable?.cornerRadius = currentRadius
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    onEnd()
+                }
+            })
+        }
+        anim.start()
     }
 
     companion object {
