@@ -604,18 +604,6 @@ class MainActivity : AppCompatActivity() {
         return if (clean.contains(" ")) clean.substringAfterLast(" ") else clean
     }
 
-    private fun readStatusFile(file: File = File("/sdcard/FileNavigator/status.txt")): String {
-        return try {
-            if (file.exists() && file.canRead()) {
-                file.readText().trim()
-            } else {
-                "idle"
-            }
-        } catch (_: Exception) {
-            "idle"
-        }
-    }
-
     private fun startTermuxAnimation() {
         if (isRunning) return
         isRunning = true
@@ -623,52 +611,65 @@ class MainActivity : AppCompatActivity() {
 
         morph(toSquare = true) {
             tvButtonLabel.visibility = View.VISIBLE
-            thinkingJob = lifecycleScope.launch(Dispatchers.IO) {
+            thinkingJob = lifecycleScope.launch {
                 val statusFile = File("/sdcard/FileNavigator/status.txt")
 
-                // Phase 1: Wait for "working"
-                withContext(Dispatchers.Main) {
-                    typeText("Starting Termux...")
-                }
+                withContext(Dispatchers.Main) { typeText("Waking Termux...") }
 
-                var phase1Count = 0
-                while (isActive) {
-                    delay(200) // Check file every 200ms
-                    val status = readStatusFile(statusFile)
-
-                    if (status == "working" || status == "done") {
-                        break // Move to Phase 2
+                // PHASE 1: Wait for Termux to actually wake up (write "starting" or "working")
+                var isAwake = false
+                var wakeAttempts = 0
+                while (isActive && !isAwake) {
+                    delay(100)
+                    val status = withContext(Dispatchers.IO) {
+                        if (statusFile.exists()) statusFile.readText().trim() else "idle"
                     }
-                    phase1Count++
-                    if (phase1Count > 15) { // Safety timeout ~3s
-                        break
+                    if (status == "starting" || status == "working") {
+                        isAwake = true
+                    }
+                    wakeAttempts++
+                    if (wakeAttempts > 80) { // Safety timeout ~8s
+                        isAwake = true
                     }
                 }
 
-                // Phase 2: Dramatic Thinking Loop
-                withContext(Dispatchers.Main) {
-                    runDramaticLoop()
-                }
+                // PHASE 2 & 3: Dramatic Loop + Check for "done"
+                val fakeMessages = listOf(
+                    "Scanning extensions...",
+                    "Reading rules...",
+                    "Moving files...",
+                    "Cleaning folders..."
+                )
+                var i = 0
+                var isDone = false
 
-                // Phase 3: Wait for "done" or "idle"
-                var phase3Count = 0
-                while (isActive) {
-                    delay(200)
-                    val status = readStatusFile(statusFile)
+                while (isActive && !isDone) {
+                    // 1. Type one fake message
+                    val msg = fakeMessages[i % fakeMessages.size]
+                    withContext(Dispatchers.Main) { typeText(msg) }
 
+                    // 2. Check the real status file
+                    val status = withContext(Dispatchers.IO) {
+                        if (statusFile.exists()) statusFile.readText().trim() else "idle"
+                    }
+
+                    // 3. If Termux finished, break the loop
                     if (status == "done" || status == "idle") {
-                        break // Move to Phase 4
+                        isDone = true
+                        break
                     }
-                    phase3Count++
-                    if (phase3Count > 25) { // Safety timeout ~5s
+
+                    i++
+                    delay(300) // Small pause so the text is readable
+                    if (i > 30) {
                         break
                     }
                 }
 
-                // Phase 4: Finish
+                // PHASE 4: Finish
                 withContext(Dispatchers.Main) {
                     typeText("Done!")
-                    delay(800) // Hold "Done!" for a moment
+                    delay(1000)
                     stopAndResetButton()
                 }
             }
@@ -681,29 +682,6 @@ class MainActivity : AppCompatActivity() {
         for (char in text) {
             tvButtonLabel.append(char.toString())
             delay(delayMs)
-        }
-    }
-
-    // The Fake AI Loop to hide the 2-second delay
-    private suspend fun CoroutineScope.runDramaticLoop() {
-        val fakeMessages = listOf(
-            "Analyzing extensions...",
-            "Checking rules...",
-            "Moving files...",
-            "Cleaning up..."
-        )
-        val statusFile = File("/sdcard/FileNavigator/status.txt")
-        var i = 0
-        while (isActive && isRunning) {
-            typeText(fakeMessages[i % fakeMessages.size])
-            delay(300)
-            i++
-            // This loop will break as soon as Phase 3 detects "done" in the background
-            val status = withContext(Dispatchers.IO) { readStatusFile(statusFile) }
-            if (status == "done" || status == "idle") {
-                break
-            }
-            if (i > 20) break // Safety break so it doesn't run forever
         }
     }
 
