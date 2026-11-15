@@ -1,8 +1,10 @@
 package com.example
 
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -10,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.DocumentsContract
+import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -38,7 +41,6 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
-import java.io.File
 /**
  * Main Activity of the application.
  * Manages manual Termux execution, script path configuration, rolling execution log, and theme.
@@ -143,7 +145,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonRun: ImageButton
     private lateinit var tvButtonLabel: TextView
     private var isRunning = false
-    private var thinkingJob: Job? = null
+    private var typingJob: Job? = null
+    private var resetJob: Job? = null
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
@@ -176,6 +179,34 @@ class MainActivity : AppCompatActivity() {
 
     private val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
     private var permissionDialog: AlertDialog? = null
+    private var notificationAccessDialog: AlertDialog? = null
+
+    private val progressReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val message = intent?.getStringExtra(FileNavigatorListenerService.EXTRA_MESSAGE) ?: return
+
+            // Update UI on main thread
+            runOnUiThread {
+                if (isRunning) {
+                    typingJob?.cancel()
+                    typingJob = null
+                    tvButtonLabel.text = message
+
+                    // If Termux says Done, trigger the reset sequence
+                    if (message.startsWith("Done!", ignoreCase = true) ||
+                        message.startsWith("Done —", ignoreCase = true) ||
+                        message.trim().equals("Done", ignoreCase = true)
+                    ) {
+                        resetJob?.cancel()
+                        resetJob = lifecycleScope.launch {
+                            delay(1000) // Let the user see "Done!"
+                            stopAndResetButton()
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private fun hasRunCommandPermission(): Boolean =
         androidx.core.content.ContextCompat.checkSelfPermission(
@@ -196,9 +227,44 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.permission_dialog_title)
             .setMessage(R.string.permission_dialog_message)
             .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
-                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.fromParts("package", packageName, null)
                 }
+                startActivity(intent)
+            }
+            .setNegativeButton(R.string.permission_dialog_dismiss, null)
+            .show()
+    }
+
+    private fun isNotificationAccessGranted(): Boolean {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        if (!flat.isNullOrEmpty()) {
+            val cn = ComponentName(this, FileNavigatorListenerService::class.java)
+            val names = flat.split(":")
+            for (name in names) {
+                val componentName = ComponentName.unflattenFromString(name)
+                if (componentName == cn) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun checkNotificationAccess() {
+        if (!isNotificationAccessGranted()) {
+            showNotificationAccessDialog()
+        }
+    }
+
+    private fun showNotificationAccessDialog() {
+        if (isFinishing || isDestroyed || notificationAccessDialog?.isShowing == true) return
+
+        notificationAccessDialog = AlertDialog.Builder(this)
+            .setTitle(R.string.notification_access_dialog_title)
+            .setMessage(R.string.notification_access_dialog_message)
+            .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
+                val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
                 startActivity(intent)
             }
             .setNegativeButton(R.string.permission_dialog_dismiss, null)
@@ -210,6 +276,15 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         checkRunCommandPermission()
+        checkNotificationAccess()
+
+        val filter = IntentFilter(FileNavigatorListenerService.ACTION_PROGRESS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(progressReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(progressReceiver, filter)
+        }
 
         applyTheme()
 
@@ -225,6 +300,10 @@ class MainActivity : AppCompatActivity() {
             permissionDialog?.dismiss()
             permissionDialog = null
         }
+        if (isNotificationAccessGranted()) {
+            notificationAccessDialog?.dismiss()
+            notificationAccessDialog = null
+        }
         LogManager.setListener { _ ->
             runOnUiThread {
                 refreshLogDisplay()
@@ -238,11 +317,17 @@ class MainActivity : AppCompatActivity() {
         LogManager.setListener(null)
         permissionDialog?.dismiss()
         permissionDialog = null
-        if (isRunning) {
-            thinkingJob?.cancel()
-            thinkingJob = null
-            stopAndResetButton()
-        }
+        notificationAccessDialog?.dismiss()
+        notificationAccessDialog = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        typingJob?.cancel()
+        resetJob?.cancel()
+        try {
+            unregisterReceiver(progressReceiver)
+        } catch (_: Exception) {}
     }
 
     private fun initViews() {
@@ -273,17 +358,6 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             if (isRunning) return@setOnClickListener
-
-            // Write "starting" to the file IMMEDIATELY so we don't read stale "done" data
-            lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val statusFile = File("/sdcard/FileNavigator/status.txt")
-                    statusFile.parentFile?.mkdirs()
-                    statusFile.writeText("starting")
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
 
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
@@ -618,86 +692,33 @@ class MainActivity : AppCompatActivity() {
     private fun startTermuxAnimation() {
         if (isRunning) return
         isRunning = true
+        resetJob?.cancel()
+        typingJob?.cancel()
         btnRunScript.setImageDrawable(null)
 
         morph(toSquare = true) {
+            if (!isRunning) return@morph
             tvButtonLabel.visibility = View.VISIBLE
-            thinkingJob = lifecycleScope.launch {
-                val statusFile = File("/sdcard/FileNavigator/status.txt")
-
-                withContext(Dispatchers.Main) { typeText("Waking Termux...") }
-
-                // PHASE 1: Wait for Termux to write "working"
-                var isAwake = false
-                var wakeAttempts = 0
-                while (isActive && !isAwake) {
-                    delay(100)
-                    val status = withContext(Dispatchers.IO) {
-                        if (statusFile.exists()) statusFile.readText().trim() else "starting"
-                    }
-                    if (status == "working") isAwake = true
-                    wakeAttempts++
-                    if (wakeAttempts > 100) { // Safety timeout ~10s
-                        isAwake = true
-                    }
-                }
-
-                // PHASE 2: Dramatic Loop + Non-blocking check
-                val fakeMessages = listOf(
-                    "Scanning extensions...",
-                    "Reading rules...",
-                    "Moving files...",
-                    "Cleaning folders..."
-                )
-                var i = 0
-                var isDone = false
-
-                // Launch a background watcher for "done"
-                val watcherJob = launch(Dispatchers.IO) {
-                    while (isActive) {
-                        delay(100) // check every 100ms
-                        val status = if (statusFile.exists()) statusFile.readText().trim() else "working"
-                        if (status == "done") {
-                            isDone = true
-                            break
-                        }
-                    }
-                }
-
-                // The typing loop
-                while (isActive && !isDone) {
-                    val msg = fakeMessages[i % fakeMessages.size]
-                    withContext(Dispatchers.Main) { typeText(msg, checkAbort = { isDone }) }
-                    if (!isDone) {
-                        i++
-                        delay(300)
-                    }
-                }
-
-                watcherJob.cancel() // stop the watcher
-
-                // PHASE 3: Instant Finish
-                withContext(Dispatchers.Main) {
-                    // Do NOT type "Done!" character by character. Show it instantly.
-                    tvButtonLabel.text = "Done!"
-                    delay(300) // Tiny pause so the user can read it
-                    stopAndResetButton()
-                }
+            typingJob = lifecycleScope.launch(Dispatchers.Main) {
+                typeText("Waking Termux...")
             }
+            // From here, the BroadcastReceiver takes over updating the text!
         }
     }
 
-    // Modify typeText to abort immediately if isDone becomes true
-    private suspend fun typeText(text: String, checkAbort: (() -> Boolean)? = null) {
+    private suspend fun typeText(text: String) {
         tvButtonLabel.text = ""
         for (char in text) {
-            if (checkAbort?.invoke() == true) break // Abort typing mid-sentence!
             tvButtonLabel.append(char.toString())
             delay(20)
         }
     }
 
     private fun stopAndResetButton() {
+        typingJob?.cancel()
+        typingJob = null
+        resetJob?.cancel()
+        resetJob = null
         tvButtonLabel.text = ""
         tvButtonLabel.visibility = View.INVISIBLE
         morph(toSquare = false) {
