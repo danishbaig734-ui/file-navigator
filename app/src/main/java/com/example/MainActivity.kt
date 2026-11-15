@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
@@ -24,12 +23,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.view.MotionEvent
-import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.PopupWindow
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -152,29 +148,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonClearLog: Button
     private lateinit var mainScrollView: ScrollView
 
-    private val folderPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val uri = result.data?.data
-        if (result.resultCode == RESULT_OK && uri != null) {
-            val flags = result.data?.flags ?: 0
-            val takeFlags = flags and (
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            ).let { granted ->
-                if (granted != 0) granted else (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            }
-            try {
-                contentResolver.takePersistableUriPermission(uri, takeFlags)
-            } catch (e: Exception) {
-                // ignore
-            }
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, uri.toString()).apply()
-            Toast.makeText(this, "Folder access updated", Toast.LENGTH_SHORT).show()
-            LogManager.append(this, "tree URI re-granted: $uri")
-        }
-    }
-
     private val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
     private var permissionDialog: AlertDialog? = null
 
@@ -261,7 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
-            showGearMenu()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         attachPressScale(buttonRun, grow = 1.08f)
@@ -420,100 +393,6 @@ class MainActivity : AppCompatActivity() {
             .alpha(1f)
             .setDuration(180)
             .setInterpolator(DecelerateInterpolator())
-            .start()
-    }
-
-    private fun regrantFolderAccess() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-            )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val hintUri = DocumentsContract.buildDocumentUri(
-                    "com.android.externalstorage.documents",
-                    "primary:FileNavigator"
-                )
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, hintUri)
-            }
-        }
-        folderPermissionLauncher.launch(intent)
-    }
-
-    private fun showGearMenu() {
-        val anchor = findViewById<ImageButton>(R.id.btnSettings)
-        val popupView = layoutInflater.inflate(R.layout.dialog_gear_menu, null)
-
-        val dark = isDarkMode()
-        val cardRoot = popupView.findViewById<LinearLayout>(R.id.dialogCardRoot)
-        val rowRegrant = popupView.findViewById<LinearLayout>(R.id.rowRegrant)
-        val rowSettings = popupView.findViewById<LinearLayout>(R.id.rowSettings)
-        val divider = popupView.findViewById<View>(R.id.dialogDivider)
-        val titles = listOf(
-            popupView.findViewById<TextView>(R.id.txtRegrantTitle),
-            popupView.findViewById<TextView>(R.id.txtSettingsTitle)
-        )
-        val subtitles = listOf(
-            popupView.findViewById<TextView>(R.id.txtRegrantSubtitle),
-            popupView.findViewById<TextView>(R.id.txtSettingsSubtitle)
-        )
-
-        val cardColor = if (dark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
-        val titleColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-        val subtitleColor = if (dark) 0xFFAAAAAA.toInt() else 0xFF666666.toInt()
-        val dividerColor = if (dark) 0xFF2A2A2A.toInt() else 0xFFE5E5E5.toInt()
-
-        // Apply compact rounded card background
-        val bg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 14f * resources.displayMetrics.density
-            setColor(cardColor)
-        }
-        cardRoot?.background = bg
-        divider?.setBackgroundColor(dividerColor)
-
-        titles.forEach { it?.setTextColor(titleColor) }
-        subtitles.forEach { it?.setTextColor(subtitleColor) }
-
-        val popupWidth = (240 * resources.displayMetrics.density).toInt()
-        val popupWindow = PopupWindow(
-            popupView,
-            popupWidth,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            true
-        ).apply {
-            elevation = 12f * resources.displayMetrics.density
-            isOutsideTouchable = true
-            isFocusable = true
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        rowRegrant?.setOnClickListener {
-            popupWindow.dismiss()
-            regrantFolderAccess()
-        }
-        rowSettings?.setOnClickListener {
-            popupWindow.dismiss()
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-
-        // Align right edge of popup with right edge of gear button, right underneath it
-        val xOffset = anchor.width - popupWidth
-        val yOffset = (6 * resources.displayMetrics.density).toInt()
-        popupWindow.showAsDropDown(anchor, xOffset, yOffset)
-
-        popupView.scaleX = 0.70f
-        popupView.scaleY = 0.70f
-        popupView.alpha = 0f
-        popupView.pivotX = popupWidth.toFloat()
-        popupView.pivotY = 0f
-        popupView.animate()
-            .scaleX(1f)
-            .scaleY(1f)
-            .alpha(1f)
-            .setInterpolator(android.view.animation.OvershootInterpolator(4f))
-            .setDuration(280)
             .start()
     }
 

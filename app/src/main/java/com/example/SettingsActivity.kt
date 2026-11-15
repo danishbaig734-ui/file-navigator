@@ -13,6 +13,7 @@ import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.MotionEvent
@@ -57,6 +58,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var switchDarkMode: SwitchCompat
     private lateinit var pillDarkTheme: TextView
     private lateinit var pillLightTheme: TextView
+    private lateinit var btnRegrantAccess: Button
 
     // Card 2: Termux Script Path
     private lateinit var cardScriptPath: LinearLayout
@@ -109,7 +111,8 @@ class SettingsActivity : AppCompatActivity() {
             prefs.edit().putString(RulesEditorActivity.PREF_KEY_RULES_TREE_URI, uri.toString()).apply()
             updateStorageDisplay()
             flashStatusPill("Folder linked ✓")
-            LogManager.log(this, "Settings: Storage folder updated to $uri")
+            Toast.makeText(this, "Folder access updated", Toast.LENGTH_SHORT).show()
+            LogManager.append(this, "tree URI re-granted: $uri")
         }
     }
 
@@ -158,6 +161,7 @@ class SettingsActivity : AppCompatActivity() {
         switchDarkMode = findViewById(R.id.switchDarkMode)
         pillDarkTheme = findViewById(R.id.pillDarkTheme)
         pillLightTheme = findViewById(R.id.pillLightTheme)
+        btnRegrantAccess = findViewById(R.id.btnRegrantAccess)
 
         cardScriptPath = findViewById(R.id.cardScriptPath)
         badgeEngine = findViewById(R.id.badgeEngine)
@@ -241,6 +245,7 @@ class SettingsActivity : AppCompatActivity() {
         attachSpringPress(btnPastePath, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(btnTestScript, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(btnChangeFolder, pressScale = 0.96f, overshoot = 3.5f)
+        attachSpringPress(btnRegrantAccess, pressScale = 0.96f, overshoot = 3.5f)
         attachSpringPress(pillDarkTheme, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(pillLightTheme, pressScale = 0.94f, overshoot = 3.5f)
 
@@ -309,25 +314,41 @@ class SettingsActivity : AppCompatActivity() {
             handleTestRun()
         }
 
+        btnRegrantAccess.setOnClickListener {
+            springPulse(btnRegrantAccess)
+            regrantFolderAccess()
+        }
+
         btnChangeFolder.setOnClickListener {
             springPulse(btnChangeFolder)
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                )
-            }
-            try {
-                folderPermissionLauncher.launch(intent)
-            } catch (e: Exception) {
-                Toast.makeText(this, "Could not open document tree: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            regrantFolderAccess()
         }
 
         btnResetAll.setOnClickListener {
             springPulse(btnResetAll)
             showResetConfirmationDialog()
+        }
+    }
+
+    private fun regrantFolderAccess() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val hintUri = DocumentsContract.buildDocumentUri(
+                    "com.android.externalstorage.documents",
+                    "primary:FileNavigator"
+                )
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, hintUri)
+            }
+        }
+        try {
+            folderPermissionLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open document tree: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -632,9 +653,13 @@ class SettingsActivity : AppCompatActivity() {
         txtStorageUriDisplay.setTextColor(uriText)
 
         if (dark) {
+            btnRegrantAccess.setBackgroundResource(R.drawable.rounded_button_ripple_white)
+            btnRegrantAccess.setTextColor(0xFF000000.toInt())
             btnChangeFolder.setBackgroundResource(R.drawable.rounded_button_ripple_white)
             btnChangeFolder.setTextColor(0xFF000000.toInt())
         } else {
+            btnRegrantAccess.setBackgroundResource(R.drawable.rounded_button_ripple_black)
+            btnRegrantAccess.setTextColor(0xFFFFFFFF.toInt())
             btnChangeFolder.setBackgroundResource(R.drawable.rounded_button_ripple_black)
             btnChangeFolder.setTextColor(0xFFFFFFFF.toInt())
         }

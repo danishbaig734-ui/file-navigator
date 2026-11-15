@@ -230,6 +230,16 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <Button
+                android:id="@+id/btnRegrantAccess"
+                style="?android:attr/buttonStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/rounded_button_ripple_white"
+                android:text="Re-grant Folder Access"
+                android:textSize="16sp" />
+
             <!-- Card 2: Termux Execution Engine -->
             <LinearLayout
                 android:id="@+id/cardScriptPath"
