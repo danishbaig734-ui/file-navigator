@@ -238,37 +238,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun isNotificationAccessGranted(): Boolean {
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        if (!flat.isNullOrEmpty()) {
-            val cn = ComponentName(this, FileNavigatorListenerService::class.java)
-            val names = flat.split(":")
-            for (name in names) {
-                val componentName = ComponentName.unflattenFromString(name)
-                if (componentName == cn) {
-                    return true
+        return flat != null && flat.contains(packageName)
+    }
+
+    private fun checkNotificationPermission() {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        if (flat == null || !flat.contains(packageName)) {
+            if (isFinishing || isDestroyed || notificationAccessDialog?.isShowing == true) return
+
+            notificationAccessDialog = AlertDialog.Builder(this)
+                .setTitle(R.string.notification_access_dialog_title)
+                .setMessage(R.string.notification_access_dialog_message)
+                .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
+                    startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
                 }
-            }
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show()
         }
-        return false
-    }
-
-    private fun checkNotificationAccess() {
-        if (!isNotificationAccessGranted()) {
-            showNotificationAccessDialog()
-        }
-    }
-
-    private fun showNotificationAccessDialog() {
-        if (isFinishing || isDestroyed || notificationAccessDialog?.isShowing == true) return
-
-        notificationAccessDialog = AlertDialog.Builder(this)
-            .setTitle(R.string.notification_access_dialog_title)
-            .setMessage(R.string.notification_access_dialog_message)
-            .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
-                val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
-                startActivity(intent)
-            }
-            .setNegativeButton(R.string.permission_dialog_dismiss, null)
-            .show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -276,7 +262,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         checkRunCommandPermission()
-        checkNotificationAccess()
 
         val filter = IntentFilter(FileNavigatorListenerService.ACTION_PROGRESS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -291,6 +276,8 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         refreshLogDisplay()
+
+        checkNotificationPermission()
     }
 
     override fun onResume() {

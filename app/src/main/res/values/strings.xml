@@ -4,8 +4,8 @@
     <string name="permission_dialog_message">File Navigator needs the Termux RUN_COMMAND permission to execute file-bus.sh.\n\nPlease enable it in Settings &gt; Apps &gt; File Navigator &gt; Permissions &gt; Additional permissions.</string>
     <string name="permission_dialog_open_settings">Open Settings</string>
     <string name="permission_dialog_dismiss">Dismiss</string>
-    <string name="notification_access_dialog_title">Notification Access Required</string>
-    <string name="notification_access_dialog_message">File Navigator needs Notification Access to read live Termux progress updates for the Run button animation.\n\nPlease enable File Navigator Listener in Notification access settings.</string>
+    <string name="notification_access_dialog_title">Permission Required</string>
+    <string name="notification_access_dialog_message">File Navigator needs Notification Access to sync the animation. Please find \'File Navigator\' in the list and turn it ON.</string>
     <string name="trigger_state_on">Trigger: ON</string>
     <string name="trigger_state_off">Trigger: OFF</string>
     <string name="button_turn_on">Turn ON</string>

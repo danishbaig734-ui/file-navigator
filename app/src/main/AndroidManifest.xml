@@ -64,7 +64,7 @@
 
         <service
             android:name=".FileNavigatorListenerService"
-            android:label="File Navigator Listener"
+            android:label="File Navigator"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>
