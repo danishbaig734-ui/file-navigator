@@ -1,10 +1,8 @@
 package com.example
 
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -145,8 +143,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonRun: ImageButton
     private lateinit var tvButtonLabel: TextView
     private var isRunning = false
-    private var typingJob: Job? = null
-    private var resetJob: Job? = null
+    private var animationJob: Job? = null
+    private var warningJob: Job? = null
     private lateinit var buttonEditRules: Button
     private lateinit var buttonViewLogs: Button
     private lateinit var rvLog: RecyclerView
@@ -179,34 +177,6 @@ class MainActivity : AppCompatActivity() {
 
     private val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
     private var permissionDialog: AlertDialog? = null
-    private var notificationAccessDialog: AlertDialog? = null
-
-    private val progressReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val message = intent?.getStringExtra(FileNavigatorListenerService.EXTRA_MESSAGE) ?: return
-
-            // Update UI on main thread
-            runOnUiThread {
-                if (isRunning) {
-                    typingJob?.cancel()
-                    typingJob = null
-                    tvButtonLabel.text = message
-
-                    // If Termux says Done, trigger the reset sequence
-                    if (message.startsWith("Done!", ignoreCase = true) ||
-                        message.startsWith("Done —", ignoreCase = true) ||
-                        message.trim().equals("Done", ignoreCase = true)
-                    ) {
-                        resetJob?.cancel()
-                        resetJob = lifecycleScope.launch {
-                            delay(1000) // Let the user see "Done!"
-                            stopAndResetButton()
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     private fun hasRunCommandPermission(): Boolean =
         androidx.core.content.ContextCompat.checkSelfPermission(
@@ -236,48 +206,17 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun isNotificationAccessGranted(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        return flat != null && flat.contains(packageName)
-    }
-
-    private fun checkNotificationPermission() {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        if (flat == null || !flat.contains(packageName)) {
-            if (isFinishing || isDestroyed || notificationAccessDialog?.isShowing == true) return
-
-            notificationAccessDialog = AlertDialog.Builder(this)
-                .setTitle(R.string.notification_access_dialog_title)
-                .setMessage(R.string.notification_access_dialog_message)
-                .setPositiveButton(R.string.permission_dialog_open_settings) { _, _ ->
-                    startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
-                }
-                .setNegativeButton(R.string.dialog_cancel, null)
-                .show()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         checkRunCommandPermission()
 
-        val filter = IntentFilter(FileNavigatorListenerService.ACTION_PROGRESS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(progressReceiver, filter, Context.RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(progressReceiver, filter)
-        }
-
         applyTheme()
 
         initViews()
         setupListeners()
         refreshLogDisplay()
-
-        checkNotificationPermission()
     }
 
     override fun onResume() {
@@ -286,10 +225,6 @@ class MainActivity : AppCompatActivity() {
         if (hasRunCommandPermission()) {
             permissionDialog?.dismiss()
             permissionDialog = null
-        }
-        if (isNotificationAccessGranted()) {
-            notificationAccessDialog?.dismiss()
-            notificationAccessDialog = null
         }
         LogManager.setListener { _ ->
             runOnUiThread {
@@ -304,17 +239,12 @@ class MainActivity : AppCompatActivity() {
         LogManager.setListener(null)
         permissionDialog?.dismiss()
         permissionDialog = null
-        notificationAccessDialog?.dismiss()
-        notificationAccessDialog = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        typingJob?.cancel()
-        resetJob?.cancel()
-        try {
-            unregisterReceiver(progressReceiver)
-        } catch (_: Exception) {}
+        animationJob?.cancel()
+        warningJob?.cancel()
     }
 
     private fun initViews() {
@@ -339,19 +269,22 @@ class MainActivity : AppCompatActivity() {
         attachPressScale(buttonViewLogs, grow = 1.04f)
         attachPressScale(buttonClearLog, grow = 1.05f)
 
-        buttonRun.setOnClickListener {
+        btnRunScript.setOnClickListener {
+            if (isRunning) {
+                showSpamWarning()
+                return@setOnClickListener
+            }
             if (!hasRunCommandPermission()) {
                 showPermissionDialog()
                 return@setOnClickListener
             }
-            if (isRunning) return@setOnClickListener
 
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentPath = prefs.getString(PREF_KEY_SCRIPT_PATH, DEFAULT_SCRIPT_PATH)?.ifEmpty {
                 DEFAULT_SCRIPT_PATH
             } ?: DEFAULT_SCRIPT_PATH
             dispatchTermux(this, currentPath)
-            startTermuxAnimation()
+            startFakeAnimation()
         }
 
         buttonEditRules.setOnClickListener {
@@ -676,36 +609,66 @@ class MainActivity : AppCompatActivity() {
         return if (clean.contains(" ")) clean.substringAfterLast(" ") else clean
     }
 
-    private fun startTermuxAnimation() {
+    private fun startFakeAnimation() {
         if (isRunning) return
         isRunning = true
-        resetJob?.cancel()
-        typingJob?.cancel()
         btnRunScript.setImageDrawable(null)
 
         morph(toSquare = true) {
             if (!isRunning) return@morph
             tvButtonLabel.visibility = View.VISIBLE
-            typingJob = lifecycleScope.launch(Dispatchers.Main) {
-                typeText("Waking Termux...")
+
+            animationJob?.cancel()
+            animationJob = lifecycleScope.launch {
+                val fakeMessages = listOf(
+                    "Waking Termux...",
+                    "Analyzing rules...",
+                    "Moving files...",
+                    "Cleaning up..."
+                )
+
+                val startTime = System.currentTimeMillis()
+                var i = 0
+
+                while (isActive && (System.currentTimeMillis() - startTime) < 3500) {
+                    if (tvButtonLabel.text != "🛑 Hold on...") {
+                        tvButtonLabel.text = fakeMessages[i % fakeMessages.size]
+                    }
+                    delay(700)
+                    i++
+                }
+
+                withContext(Dispatchers.Main) {
+                    warningJob?.cancel()
+                    tvButtonLabel.text = "Done!"
+                    delay(800)
+                    stopAndResetButton()
+                }
             }
-            // From here, the BroadcastReceiver takes over updating the text!
         }
     }
 
-    private suspend fun typeText(text: String) {
-        tvButtonLabel.text = ""
-        for (char in text) {
-            tvButtonLabel.append(char.toString())
-            delay(20)
+    private fun showSpamWarning() {
+        if (isRunning) {
+            val currentText = tvButtonLabel.text
+            val originalText = if (currentText != "🛑 Hold on...") currentText else return
+            tvButtonLabel.text = "🛑 Hold on..."
+
+            warningJob?.cancel()
+            warningJob = lifecycleScope.launch {
+                delay(1000)
+                if (isRunning && tvButtonLabel.text == "🛑 Hold on...") {
+                    tvButtonLabel.text = originalText
+                }
+            }
         }
     }
 
     private fun stopAndResetButton() {
-        typingJob?.cancel()
-        typingJob = null
-        resetJob?.cancel()
-        resetJob = null
+        animationJob?.cancel()
+        animationJob = null
+        warningJob?.cancel()
+        warningJob = null
         tvButtonLabel.text = ""
         tvButtonLabel.visibility = View.INVISIBLE
         morph(toSquare = false) {
