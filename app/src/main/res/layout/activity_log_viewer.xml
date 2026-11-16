@@ -201,6 +201,7 @@
                 android:id="@+id/rvLogViewer"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:background="@android:color/transparent"
                 android:clipToPadding="false"
                 android:longClickable="true"
                 android:overScrollMode="always"

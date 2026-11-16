@@ -1,5 +1,6 @@
 package com.example
 
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,6 +31,14 @@ class MainLogAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
+
+        // 0. Card background
+        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFF5F5F5.toInt()
+        holder.itemView.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 16f * holder.itemView.context.resources.displayMetrics.density
+            setColor(cardColor)
+        }
 
         // 1. Time pill
         holder.tvTimestamp.text = item.timestamp

@@ -125,7 +125,8 @@ class MainActivity : AppCompatActivity() {
         val fieldBgColor = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
 
         val logRecycler = findViewById<RecyclerView>(R.id.rvLog)
-        (logRecycler.background.mutate() as? GradientDrawable)?.apply {
+        logRecycler.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
             cornerRadius = 28f * resources.displayMetrics.density
             setColor(fieldBgColor)
         }

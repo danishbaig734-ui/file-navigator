@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -30,7 +29,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 
 /**
@@ -55,10 +53,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var imgThemeIcon: ImageView
     private lateinit var txtDarkModeTitle: TextView
     private lateinit var txtDarkModeSubtitle: TextView
-    private lateinit var switchDarkMode: SwitchCompat
     private lateinit var pillDarkTheme: TextView
     private lateinit var pillLightTheme: TextView
-    private lateinit var btnRegrantAccess: Button
 
     // Card 2: Termux Script Path
     private lateinit var cardScriptPath: LinearLayout
@@ -158,10 +154,8 @@ class SettingsActivity : AppCompatActivity() {
         imgThemeIcon = findViewById(R.id.imgThemeIcon)
         txtDarkModeTitle = findViewById(R.id.txtDarkModeTitle)
         txtDarkModeSubtitle = findViewById(R.id.txtDarkModeSubtitle)
-        switchDarkMode = findViewById(R.id.switchDarkMode)
         pillDarkTheme = findViewById(R.id.pillDarkTheme)
         pillLightTheme = findViewById(R.id.pillLightTheme)
-        btnRegrantAccess = findViewById(R.id.btnRegrantAccess)
 
         cardScriptPath = findViewById(R.id.cardScriptPath)
         badgeEngine = findViewById(R.id.badgeEngine)
@@ -194,9 +188,6 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun loadPreferences() {
         val prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val isDark = prefs.getBoolean(KEY_DARK_MODE, true)
-        switchDarkMode.isChecked = isDark
-
         val savedPath = prefs.getString(MainActivity.PREF_KEY_SCRIPT_PATH, MainActivity.DEFAULT_SCRIPT_PATH)
             ?: MainActivity.DEFAULT_SCRIPT_PATH
         etScriptPath.setText(savedPath)
@@ -245,27 +236,20 @@ class SettingsActivity : AppCompatActivity() {
         attachSpringPress(btnPastePath, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(btnTestScript, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(btnChangeFolder, pressScale = 0.96f, overshoot = 3.5f)
-        attachSpringPress(btnRegrantAccess, pressScale = 0.96f, overshoot = 3.5f)
         attachSpringPress(pillDarkTheme, pressScale = 0.94f, overshoot = 3.5f)
         attachSpringPress(pillLightTheme, pressScale = 0.94f, overshoot = 3.5f)
-
-        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked != isDarkMode()) {
-                setDarkMode(isChecked)
-            }
-        }
 
         pillDarkTheme.setOnClickListener {
             if (!isDarkMode()) {
                 springPulse(pillDarkTheme)
-                switchDarkMode.isChecked = true
+                setDarkMode(true)
             }
         }
 
         pillLightTheme.setOnClickListener {
             if (isDarkMode()) {
                 springPulse(pillLightTheme)
-                switchDarkMode.isChecked = false
+                setDarkMode(false)
             }
         }
 
@@ -312,11 +296,6 @@ class SettingsActivity : AppCompatActivity() {
         btnTestScript.setOnClickListener {
             springPulse(btnTestScript)
             handleTestRun()
-        }
-
-        btnRegrantAccess.setOnClickListener {
-            springPulse(btnRegrantAccess)
-            regrantFolderAccess()
         }
 
         btnChangeFolder.setOnClickListener {
@@ -422,7 +401,6 @@ class SettingsActivity : AppCompatActivity() {
                 .putString(MainActivity.PREF_KEY_SCRIPT_PATH, MainActivity.DEFAULT_SCRIPT_PATH)
                 .apply()
 
-            switchDarkMode.isChecked = true
             etScriptPath.setText(MainActivity.DEFAULT_SCRIPT_PATH)
             applyTheme()
             flashStatusPill("Settings Reset ✓")
@@ -568,12 +546,6 @@ class SettingsActivity : AppCompatActivity() {
         }
         imgThemeIcon.setColorFilter(iconTint)
 
-        // Switch Colors
-        val thumbColor = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-        val trackColor = if (dark) 0xFF444444.toInt() else 0xFFCCCCCC.toInt()
-        switchDarkMode.thumbTintList = ColorStateList.valueOf(thumbColor)
-        switchDarkMode.trackTintList = ColorStateList.valueOf(trackColor)
-
         // Theme Dual Pill Selector
         val activePillBg = if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
         val activePillText = if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
@@ -653,13 +625,9 @@ class SettingsActivity : AppCompatActivity() {
         txtStorageUriDisplay.setTextColor(uriText)
 
         if (dark) {
-            btnRegrantAccess.setBackgroundResource(R.drawable.rounded_button_ripple_white)
-            btnRegrantAccess.setTextColor(0xFF000000.toInt())
             btnChangeFolder.setBackgroundResource(R.drawable.rounded_button_ripple_white)
             btnChangeFolder.setTextColor(0xFF000000.toInt())
         } else {
-            btnRegrantAccess.setBackgroundResource(R.drawable.rounded_button_ripple_black)
-            btnRegrantAccess.setTextColor(0xFFFFFFFF.toInt())
             btnChangeFolder.setBackgroundResource(R.drawable.rounded_button_ripple_black)
             btnChangeFolder.setTextColor(0xFFFFFFFF.toInt())
         }

@@ -1,5 +1,6 @@
 package com.example
 
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class LogRunAdapter(
     private var items: List<LogRun>,
-    private val isDark: Boolean,
+    private var isDark: Boolean,
     private val onItemClick: ((LogRun) -> Unit)? = null
 ) : RecyclerView.Adapter<LogRunAdapter.VH>() {
 
@@ -26,14 +27,23 @@ class LogRunAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
 
-        // 1. Timestamp
+        // 1. Set the Card Background
+        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFF5F5F5.toInt()
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 16f * holder.itemView.context.resources.displayMetrics.density
+            setColor(cardColor)
+        }
+        holder.itemView.background = bg
+
+        // 2. Set Text Colors & Timestamp Pill
         holder.tvTimestamp.text = item.timestamp
         holder.tvTimestamp.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
         holder.tvTimestamp.setBackgroundResource(
             if (isDark) R.drawable.log_pill_neutral_dark else R.drawable.log_pill_neutral_light
         )
 
-        // 2. Messages (Join with newlines)
+        // 3. Message Text
         if (item.messages.isEmpty()) {
             holder.tvMessages.visibility = View.GONE
         } else {
@@ -42,7 +52,7 @@ class LogRunAdapter(
             holder.tvMessages.setTextColor(if (isDark) 0xFFB0B0B0.toInt() else 0xFF555555.toInt())
         }
 
-        // 3. Summary
+        // 4. Summary Text
         holder.tvSummary.text = item.summary
         val summaryColor = when (item.type) {
             LogType.SUCCESS -> if (isDark) 0xFF66BB6A.toInt() else 0xFF2E7D32.toInt()
@@ -60,6 +70,7 @@ class LogRunAdapter(
 
     fun update(newItems: List<LogRun>, dark: Boolean = isDark) {
         items = newItems
+        isDark = dark
         notifyDataSetChanged()
     }
 }

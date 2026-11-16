@@ -197,10 +197,13 @@ class LogViewerActivity : AppCompatActivity() {
 
         // 7. Log card container
         val cardBg = if (dark) 0xFF0F0F0F.toInt() else 0xFFFFFFFF.toInt()
-        (logCardContainer.background.mutate() as? GradientDrawable)?.apply {
+        logCardContainer.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
             cornerRadius = 24f * resources.displayMetrics.density
             setColor(cardBg)
         }
+        rvLogViewer.setBackgroundColor(Color.TRANSPARENT)
+        txtEmptyLogs.setTextColor(if (dark) 0xFFCCCCCC.toInt() else 0xFF555555.toInt())
 
         loadCurrentLog()
     }
@@ -405,27 +408,27 @@ class LogViewerActivity : AppCompatActivity() {
         val dark = isDarkMode()
 
         if (uriString == null) {
-            displayEntries(listOf(LogRun("—", emptyList(), "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
+            displayStatusMessage("(tree URI invalid — re-grant folder access)", LogType.ERROR, dark)
             return
         }
 
         val treeUri = Uri.parse(uriString)
         val root = DocumentFile.fromTreeUri(this, treeUri)
         if (root == null || !root.canRead()) {
-            displayEntries(listOf(LogRun("—", emptyList(), "(tree URI invalid — re-grant folder access)", LogType.ERROR)), dark)
+            displayStatusMessage("(tree URI invalid — re-grant folder access)", LogType.ERROR, dark)
             return
         }
 
         val logsDir = root.findFile("logs")
         if (logsDir == null || !logsDir.isDirectory) {
-            displayEntries(listOf(LogRun("—", emptyList(), "(logs folder not found)", LogType.NEUTRAL)), dark)
+            displayStatusMessage("(logs folder not found)", LogType.NEUTRAL, dark)
             return
         }
 
         val fileName = currentTab.fileName
         val logFile = logsDir.findFile(fileName)
         if (logFile == null) {
-            displayEntries(emptyList(), dark)
+            showEmptyLogs()
             return
         }
 
@@ -435,21 +438,45 @@ class LogViewerActivity : AppCompatActivity() {
             } ?: emptyList()
 
             val rawContent = lines.takeLast(200).joinToString("\n").trim()
-            val entries = if (rawContent.isEmpty()) {
-                emptyList()
-            } else {
-                LogParser.parseLogLines(rawContent)
+            if (rawContent.isEmpty()) {
+                showEmptyLogs()
+                return
             }
-            displayEntries(entries, dark)
+
+            if (currentTab == LogTab.ACTIONS) {
+                val entries = LogParser.parseLogLines(rawContent)
+                displayActionEntries(entries, dark)
+            } else {
+                val rawLines = rawContent.split("\n")
+                    .map { it.trimEnd() }
+                    .filter { it.isNotBlank() }
+                displayRawLines(rawLines, dark, isErrorTab = (currentTab == LogTab.ERRORS))
+            }
         } catch (_: Exception) {
-            displayEntries(listOf(LogRun("—", emptyList(), "(error reading log file)", LogType.ERROR)), dark)
+            displayStatusMessage("(error reading log file)", LogType.ERROR, dark)
         }
     }
 
-    private fun displayEntries(entries: List<LogRun>, dark: Boolean) {
+    private fun showEmptyLogs() {
+        txtEmptyLogs.visibility = View.VISIBLE
+        rvLogViewer.visibility = View.GONE
+    }
+
+    private fun displayStatusMessage(message: String, type: LogType, dark: Boolean) {
+        if (currentTab == LogTab.ACTIONS) {
+            displayActionEntries(listOf(LogRun("—", emptyList(), message, type)), dark)
+        } else {
+            displayRawLines(
+                listOf(message),
+                dark,
+                isErrorTab = (currentTab == LogTab.ERRORS || type == LogType.ERROR)
+            )
+        }
+    }
+
+    private fun displayActionEntries(entries: List<LogRun>, dark: Boolean) {
         if (entries.isEmpty()) {
-            txtEmptyLogs.visibility = View.VISIBLE
-            rvLogViewer.visibility = View.GONE
+            showEmptyLogs()
         } else {
             txtEmptyLogs.visibility = View.GONE
             rvLogViewer.visibility = View.VISIBLE
@@ -458,12 +485,27 @@ class LogViewerActivity : AppCompatActivity() {
                 logAdapter = LogRunAdapter(entries, dark) { run ->
                     copyLogToClipboard(run)
                 }
-                rvLogViewer.adapter = logAdapter
             } else {
                 logAdapter?.update(entries, dark)
             }
+            if (rvLogViewer.adapter !== logAdapter) {
+                rvLogViewer.adapter = logAdapter
+            }
             rvLogViewer.post {
                 rvLogViewer.scrollToPosition(entries.size - 1)
+            }
+        }
+    }
+
+    private fun displayRawLines(lines: List<String>, dark: Boolean, isErrorTab: Boolean) {
+        if (lines.isEmpty()) {
+            showEmptyLogs()
+        } else {
+            txtEmptyLogs.visibility = View.GONE
+            rvLogViewer.visibility = View.VISIBLE
+            rvLogViewer.adapter = RawLogAdapter(lines, dark, isErrorTab)
+            rvLogViewer.post {
+                rvLogViewer.scrollToPosition(lines.size - 1)
             }
         }
     }

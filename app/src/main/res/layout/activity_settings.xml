@@ -188,11 +188,6 @@
                             android:text="Deep OLED dark theme vs crisp light theme"
                             android:textSize="12sp" />
                     </LinearLayout>
-
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switchDarkMode"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
                 </LinearLayout>
 
                 <!-- Quick Theme Pill Selector -->
@@ -229,16 +224,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
-
-            <Button
-                android:id="@+id/btnRegrantAccess"
-                style="?android:attr/buttonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/rounded_button_ripple_white"
-                android:text="Re-grant Folder Access"
-                android:textSize="16sp" />
 
             <!-- Card 2: Termux Execution Engine -->
             <LinearLayout
