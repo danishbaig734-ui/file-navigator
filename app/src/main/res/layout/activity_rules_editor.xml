@@ -70,7 +70,7 @@
 
         <!-- Hero Header section matching MainActivity -->
         <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/heroHeader"
+            android:id="@+id/largeHeaderArea"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="16dp"

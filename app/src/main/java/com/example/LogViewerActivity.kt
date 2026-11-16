@@ -131,6 +131,8 @@ class LogViewerActivity : AppCompatActivity() {
     private lateinit var txtEmptyLogs: TextView
 
     private var logAdapter: LogRunAdapter? = null
+    private var unmatchedAdapter: UnmatchedLogAdapter? = null
+    private var errorAdapter: ErrorLogAdapter? = null
     private var currentTabIndex: Int = 0
     private var currentTab: LogTab = LogTab.ACTIONS
     private var isSecretLongPressDetected = false
@@ -443,14 +445,19 @@ class LogViewerActivity : AppCompatActivity() {
                 return
             }
 
-            if (currentTab == LogTab.ACTIONS) {
-                val entries = LogParser.parseLogLines(rawContent)
-                displayActionEntries(entries, dark)
-            } else {
-                val rawLines = rawContent.split("\n")
-                    .map { it.trimEnd() }
-                    .filter { it.isNotBlank() }
-                displayRawLines(rawLines, dark, isErrorTab = (currentTab == LogTab.ERRORS))
+            when (currentTab) {
+                LogTab.ACTIONS -> {
+                    val entries = LogParser.parseLogLines(rawContent)
+                    displayActionEntries(entries, dark)
+                }
+                LogTab.UNMATCHED -> {
+                    val entries = parseUnmatched(rawContent)
+                    displayUnmatchedEntries(entries, dark)
+                }
+                LogTab.ERRORS -> {
+                    val entries = parseErrors(rawContent)
+                    displayErrorEntries(entries, dark)
+                }
             }
         } catch (_: Exception) {
             displayStatusMessage("(error reading log file)", LogType.ERROR, dark)
@@ -463,14 +470,10 @@ class LogViewerActivity : AppCompatActivity() {
     }
 
     private fun displayStatusMessage(message: String, type: LogType, dark: Boolean) {
-        if (currentTab == LogTab.ACTIONS) {
-            displayActionEntries(listOf(LogRun("—", emptyList(), message, type)), dark)
-        } else {
-            displayRawLines(
-                listOf(message),
-                dark,
-                isErrorTab = (currentTab == LogTab.ERRORS || type == LogType.ERROR)
-            )
+        when (currentTab) {
+            LogTab.ACTIONS -> displayActionEntries(listOf(LogRun("—", emptyList(), message, type)), dark)
+            LogTab.UNMATCHED -> displayUnmatchedEntries(listOf(UnmatchedEntry("—", 1, message, "")), dark)
+            LogTab.ERRORS -> displayErrorEntries(listOf(ErrorEntry("—", message)), dark)
         }
     }
 
@@ -497,17 +500,71 @@ class LogViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun displayRawLines(lines: List<String>, dark: Boolean, isErrorTab: Boolean) {
-        if (lines.isEmpty()) {
+    private fun displayUnmatchedEntries(entries: List<UnmatchedEntry>, dark: Boolean) {
+        if (entries.isEmpty()) {
             showEmptyLogs()
         } else {
             txtEmptyLogs.visibility = View.GONE
             rvLogViewer.visibility = View.VISIBLE
-            rvLogViewer.adapter = RawLogAdapter(lines, dark, isErrorTab)
+
+            if (unmatchedAdapter == null) {
+                unmatchedAdapter = UnmatchedLogAdapter(entries, dark) { entry ->
+                    val text = buildString {
+                        if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
+                            append(entry.timestamp).append(" — ")
+                        }
+                        append("[${entry.count}×] ").append(entry.filePath)
+                        if (entry.reason.isNotBlank()) {
+                            append(" — ").append(entry.reason)
+                        }
+                    }
+                    copyRawTextToClipboard("Unmatched Entry", text)
+                }
+            } else {
+                unmatchedAdapter?.update(entries, dark)
+            }
+            if (rvLogViewer.adapter !== unmatchedAdapter) {
+                rvLogViewer.adapter = unmatchedAdapter
+            }
             rvLogViewer.post {
-                rvLogViewer.scrollToPosition(lines.size - 1)
+                rvLogViewer.scrollToPosition(entries.size - 1)
             }
         }
+    }
+
+    private fun displayErrorEntries(entries: List<ErrorEntry>, dark: Boolean) {
+        if (entries.isEmpty()) {
+            showEmptyLogs()
+        } else {
+            txtEmptyLogs.visibility = View.GONE
+            rvLogViewer.visibility = View.VISIBLE
+
+            if (errorAdapter == null) {
+                errorAdapter = ErrorLogAdapter(entries, dark) { entry ->
+                    val text = if (entry.timestamp.isNotBlank() && entry.timestamp != "—") {
+                        "${entry.timestamp} — ${entry.message}"
+                    } else {
+                        entry.message
+                    }
+                    copyRawTextToClipboard("Error Entry", text)
+                }
+            } else {
+                errorAdapter?.update(entries, dark)
+            }
+            if (rvLogViewer.adapter !== errorAdapter) {
+                rvLogViewer.adapter = errorAdapter
+            }
+            rvLogViewer.post {
+                rvLogViewer.scrollToPosition(entries.size - 1)
+            }
+        }
+    }
+
+    private fun copyRawTextToClipboard(label: String, text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, text)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
     private fun copyLogToClipboard(run: LogRun) {

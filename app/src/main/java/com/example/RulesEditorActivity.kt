@@ -35,6 +35,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * Rules Editor Activity styled with the futuristic, high-contrast monochrome aesthetic
@@ -369,6 +371,28 @@ class RulesEditorActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         applyTheme()
+
+        val largeHeader = findViewById<View>(R.id.largeHeaderArea)
+        val contentRoot = findViewById<View>(android.R.id.content)
+        ViewCompat.setOnApplyWindowInsetsListener(contentRoot) { view, insets ->
+            val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            if (imeVisible) {
+                if (largeHeader.visibility == View.VISIBLE) {
+                    largeHeader.animate().cancel()
+                    largeHeader.visibility = View.GONE
+                }
+            } else {
+                if (largeHeader.visibility == View.GONE) {
+                    largeHeader.alpha = 0f
+                    largeHeader.visibility = View.VISIBLE
+                    largeHeader.animate()
+                        .alpha(1f)
+                        .setDuration(180)
+                        .start()
+                }
+            }
+            ViewCompat.onApplyWindowInsets(view, insets)
+        }
 
         // Start in Read Mode by default so the keyboard doesn't pop up automatically
         setEditMode(false)
