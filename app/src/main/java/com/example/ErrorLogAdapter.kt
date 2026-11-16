@@ -27,21 +27,19 @@ class ErrorLogAdapter(
         val item = items[position]
         val density = holder.itemView.context.resources.displayMetrics.density
 
-        // 1. Card Background (#1E1E1E dark / #FFFFFF light)
-        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
-        val strokeColor = if (isDark) 0xFF4A2024.toInt() else 0xFFFFCDD2.toInt()
+        // 1. Solid Card Background matching LogRunAdapter (#1E1E1E dark / #F5F5F5 light)
+        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFF5F5F5.toInt()
         holder.itemView.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 16f * density
             setColor(cardColor)
-            setStroke((1f * density).toInt(), strokeColor)
         }
 
-        // 2. Timestamp Pill
+        // 2. Timestamp Pill matching LogRunAdapter
         holder.tvTimestamp.text = item.timestamp
-        holder.tvTimestamp.setTextColor(if (isDark) 0xFFE57373.toInt() else 0xFF721C24.toInt())
+        holder.tvTimestamp.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
         holder.tvTimestamp.setBackgroundResource(
-            if (isDark) R.drawable.log_pill_error_dark else R.drawable.log_pill_error_light
+            if (isDark) R.drawable.log_pill_neutral_dark else R.drawable.log_pill_neutral_light
         )
 
         // 3. Error Message

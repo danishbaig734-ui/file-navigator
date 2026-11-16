@@ -29,17 +29,15 @@ class UnmatchedLogAdapter(
         val item = items[position]
         val density = holder.itemView.context.resources.displayMetrics.density
 
-        // 1. Card Background (#1E1E1E dark / #FFFFFF light)
-        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
-        val strokeColor = if (isDark) 0xFF2C2C2C.toInt() else 0xFFE5E5E5.toInt()
+        // 1. Solid Card Background matching LogRunAdapter (#1E1E1E dark / #F5F5F5 light)
+        val cardColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFF5F5F5.toInt()
         holder.itemView.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 16f * density
             setColor(cardColor)
-            setStroke((1f * density).toInt(), strokeColor)
         }
 
-        // 2. Timestamp Pill
+        // 2. Timestamp Pill matching LogRunAdapter
         holder.tvTimestamp.text = item.timestamp
         holder.tvTimestamp.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
         holder.tvTimestamp.setBackgroundResource(
@@ -57,7 +55,7 @@ class UnmatchedLogAdapter(
 
         // 4. File Path
         holder.tvFilePath.text = item.filePath
-        holder.tvFilePath.setTextColor(if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+        holder.tvFilePath.setTextColor(if (isDark) 0xFFE0E0E0.toInt() else 0xFF1A1A1A.toInt())
 
         // 5. Reason
         if (item.reason.isBlank()) {
@@ -65,7 +63,7 @@ class UnmatchedLogAdapter(
         } else {
             holder.tvReason.visibility = View.VISIBLE
             holder.tvReason.text = item.reason
-            holder.tvReason.setTextColor(if (isDark) 0xFF9E9E9E.toInt() else 0xFF666666.toInt())
+            holder.tvReason.setTextColor(if (isDark) 0xFFB0B0B0.toInt() else 0xFF555555.toInt())
         }
 
         holder.itemView.setOnClickListener {

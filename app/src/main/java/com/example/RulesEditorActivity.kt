@@ -372,25 +372,39 @@ class RulesEditorActivity : AppCompatActivity() {
         setupListeners()
         applyTheme()
 
-        val largeHeader = findViewById<View>(R.id.largeHeaderArea)
-        val contentRoot = findViewById<View>(android.R.id.content)
-        ViewCompat.setOnApplyWindowInsetsListener(contentRoot) { view, insets ->
+        val largeHeader = findViewById<View>(R.id.largeHeader)
+        largeHeader.pivotY = 0f
+        var isHeaderShowing = true
+
+        ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { view, insets ->
             val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-            if (imeVisible) {
-                if (largeHeader.visibility == View.VISIBLE) {
-                    largeHeader.animate().cancel()
-                    largeHeader.visibility = View.GONE
-                }
-            } else {
-                if (largeHeader.visibility == View.GONE) {
-                    largeHeader.alpha = 0f
-                    largeHeader.visibility = View.VISIBLE
-                    largeHeader.animate()
-                        .alpha(1f)
-                        .setDuration(180)
-                        .start()
-                }
+
+            if (imeVisible && isHeaderShowing) {
+                isHeaderShowing = false
+                largeHeader.animate().cancel()
+                largeHeader.animate()
+                    .scaleY(0f)
+                    .alpha(0f)
+                    .setDuration(250)
+                    .withEndAction {
+                        if (!isHeaderShowing) {
+                            largeHeader.visibility = View.GONE
+                        }
+                    }
+                    .start()
+            } else if (!imeVisible && !isHeaderShowing) {
+                isHeaderShowing = true
+                largeHeader.animate().cancel()
+                largeHeader.visibility = View.VISIBLE
+                largeHeader.scaleY = 0f
+                largeHeader.alpha = 0f
+                largeHeader.animate()
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(250)
+                    .start()
             }
+
             ViewCompat.onApplyWindowInsets(view, insets)
         }
 

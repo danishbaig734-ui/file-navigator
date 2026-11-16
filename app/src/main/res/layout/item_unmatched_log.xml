@@ -7,7 +7,7 @@
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp">
 
     <!-- Top Row: Timestamp pill + Count badge -->
     <LinearLayout
@@ -20,23 +20,23 @@
             android:id="@+id/tvTimestamp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/orbitron_bold"
+            android:fontFamily="@font/anta"
             android:maxLines="1"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:textSize="12sp" />
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textSize="10sp" />
 
         <TextView
             android:id="@+id/tvCountBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:fontFamily="@font/orbitron_bold"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/anta"
             android:maxLines="1"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp" />
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textSize="10sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Middle: File path -->
@@ -44,18 +44,19 @@
         android:id="@+id/tvFilePath"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:fontFamily="monospace"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/anta"
         android:lineSpacingMultiplier="1.2"
-        android:textSize="12sp" />
+        android:textSize="11sp" />
 
     <!-- Bottom: Reason -->
     <TextView
         android:id="@+id/tvReason"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:fontFamily="sans-serif"
-        android:textSize="12sp" />
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/anta"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
 </LinearLayout>
